@@ -45,3 +45,8 @@ mat=csv \
 
 clean:
 	rm -f exports/*.csv
+
+validate:
+	bq query --nouse_legacy_sql < scripts/10_validation.sql
+
+quick: run_all validate exports
