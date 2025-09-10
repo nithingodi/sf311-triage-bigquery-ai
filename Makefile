@@ -1,11 +1,13 @@
-PROJECT_ID = sf311-triage-2025
-DATASET    = sf311
-LOCATION   = US
+PROJECT_ID ?= sf311-triage-2025
+DATASET    ?= sf311
+LOCATION   ?= US
+
+.PHONY: all prepare_dirs run_all exports validate quick clean
 
 all: prepare_dirs run_all
 
 prepare_dirs:
-	mkdir -p exports diagrams
+	@mkdir -p exports diagrams
 
 SQLS = \
   scripts/02_models.sql \
@@ -27,26 +29,25 @@ run_all:
 	@echo "== Bootstrapping GCP project =="
 	bash scripts/00_bootstrap.sh
 	@echo "== Running SQL scripts in order =="
+	@set -e; \
 	for f in $(SQLS); do \
 		echo "Running $$f"; \
-		bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query --use_legacy_sql=false < $$f || exit 1; \
+		bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query --use_legacy_sql=false < $$f; \
 	done
 
 exports:
-	mkdir -p exports
+	@mkdir -p exports
 	bq query --nouse_legacy_sql --format=csv \
-	  'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_proto_comparison_metrics`' > exports/proto_metrics.csv
+	  "SELECT * FROM \`$(PROJECT_ID).$(DATASET).v_proto_comparison_metrics\`" > exports/proto_metrics.csv
 	bq query --nouse_legacy_sql --format=csv \
-	  'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_alignment_pie`' > exports/alignment_pie.csv
-	bq query --nouse_legacy_sql --fo
-
-mat=csv \
-	  'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_mismatch_examples`' > exports/mismatch_examples.csv
-
-clean:
-	rm -f exports/*.csv
+	  "SELECT * FROM \`$(PROJECT_ID).$(DATASET).v_alignment_pie\`" > exports/alignment_pie.csv
+	bq query --nouse_legacy_sql --format=csv \
+	  "SELECT * FROM \`$(PROJECT_ID).$(DATASET).v_mismatch_examples\`" > exports/mismatch_examples.csv
 
 validate:
 	bq query --nouse_legacy_sql < scripts/10_validation.sql
 
 quick: run_all validate exports
+
+clean:
+	rm -f exports/*.csv
