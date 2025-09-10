@@ -107,7 +107,8 @@ bq query --nouse_legacy_sql \
 
 bq query --nouse_legacy_sql \
   'SELECT * FROM `sf311-triage-2025.sf311.v_mismatch_examples`' > exports/mismatch_examples.csv
-📋 Submission Checklist
+```
+## 📋 Submission Checklist
 [x] Writeup (Problem, Impact, Architecture, Results, Limitations, Assets)
 
 [x] Public repo/notebook (this repo)
@@ -116,13 +117,14 @@ bq query --nouse_legacy_sql \
 
 [x] Survey.txt (answers: 1mo BigQuery AI, 4mo GCP, feedback)
 
-[ ] (Optional) Loom/YouTube demo
+[x] 
 
-⚠️ Limitations
+## ⚠️ Limitations
 Small policy catalog (hand-curated); real deployment needs full code/policy ingestion.
 
 Demo cohort capped at 400 rows (200 text + 200 image) for free-tier credits.
 
 No full streaming pipeline; batch-only for Kaggle scope.
 
-📑 License
+## 📑 License
+MIT
