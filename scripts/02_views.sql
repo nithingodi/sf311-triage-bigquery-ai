@@ -1,11 +1,7 @@
 -- Project: City311 Multimodal Triage with BigQuery AI
 -- Script: 02_views.sql
 -- Purpose: Provide normalized SF311 cases and a cleaned text view ready for classification/summarization.
--- Inputs: bigquery-public-data.san_francisco_311.311_service_requests
--- Outputs: sf311.cases_norm (VIEW), sf311.cases_for_classify (VIEW)
 -- Idempotency: CREATE OR REPLACE VIEW (safe to re-run).
--- Parameters: Set your project/dataset below.
--- Next: 03_images.sql (object table/image handling) and 04_triage.sql (AI.GENERATE triage JSON)
 
 -- ===========
 -- PARAMETERS
@@ -30,9 +26,6 @@ EXECUTE IMMEDIATE FORMAT("""
 
 -- =====================================
 -- Cleaned text view for classification
---  - Removes boilerplate/duplicates
---  - Normalizes spacing/casing/punctuation
---  - Backfills very-short/empty text with a tagged fallback
 -- =====================================
 EXECUTE IMMEDIATE FORMAT("""
   CREATE OR REPLACE VIEW `%s.%s.cases_for_classify` AS
@@ -74,4 +67,13 @@ EXECUTE IMMEDIATE FORMAT("""
            END
     END AS complaint_text
   FROM norm
+""", project_id, dataset, project_id, dataset);
+
+-- (optional) quick sanity checks
+EXECUTE IMMEDIATE FORMAT("""
+  SELECT 'cases_norm' AS view_name, COUNT(*) AS n FROM `%s.%s.cases_norm` LIMIT 1
+""", project_id, dataset);
+
+EXECUTE IMMEDIATE FORMAT("""
+  SELECT 'cases_for_classify' AS view_name, COUNT(*) AS n FROM `%s.%s.cases_for_classify` LIMIT 1
 """, project_id, dataset);
