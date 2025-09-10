@@ -1,16 +1,45 @@
-CREATE OR REPLACE VIEW `sf311-triage-2025.sf311.v_proto_comparison_metrics` AS
-SELECT 'No-AI (Text-only)' AS cohort, 200 AS total, 193 AS matched, 0.965 AS match_rate
-UNION ALL
-SELECT 'With AI (Text+Image)' AS cohort, 400 AS total, 393 AS matched, 0.9825 AS match_rate;
+-- Project: City311 Multimodal Triage with BigQuery AI
+-- Script: 08_dashboards.sql
+-- Purpose:
+--   Produce chart/snippet tables for the writeup:
+--     - Alignment pie (match / mismatch-corrected / no_policy)
+--     - Mismatch examples (before → after)
+-- Inputs:
+--   - sf311.batch_triage_policy_refined_v2 (final refinement table)
+-- Outputs:
+--   - VIEW  sf311.v_alignment_pie
+--   - VIEW  sf311.v_mismatch_examples   (limited)
+-- Idempotency: CREATE OR REPLACE (safe)
 
-CREATE OR REPLACE VIEW `sf311-triage-2025.sf311.v_alignment_pie` AS
-SELECT 'match' AS label, 0.93*317 AS count_rows
-UNION ALL
-SELECT 'mismatch_corrected', 0.05*317
-UNION ALL
-SELECT 'no_policy', 0.02*317;
+DECLARE project_id STRING DEFAULT 'sf311-triage-2025';
+DECLARE dataset    STRING DEFAULT 'sf311';
 
-CREATE OR REPLACE VIEW `sf311-triage-2025.sf311.v_mismatch_examples` AS
-SELECT 'EX-001' AS service_request_id, 'Before action' AS before, 'After refined action' AS after
-UNION ALL
-SELECT 'EX-002', 'Before action 2', 'After refined action 2';
+-- Alignment pie counts (for the 93 / 5 / 2 style chart)
+EXECUTE IMMEDIATE FORMAT("""
+  CREATE OR REPLACE VIEW `%s.%s.v_alignment_pie` AS
+  SELECT
+    alignment,
+    COUNT(*) AS ct,
+    ROUND(100 * COUNT(*) / SUM(COUNT(*)) OVER (), 1) AS pct
+  FROM `%s.%s.batch_triage_policy_refined_v2`
+  GROUP BY alignment
+  ORDER BY ct DESC
+""", project_id, dataset, project_id, dataset);
+
+-- Mismatch examples: show before → after with policy title (cap a few)
+EXECUTE IMMEDIATE FORMAT("""
+  CREATE OR REPLACE VIEW `%s.%s.v_mismatch_examples` AS
+  SELECT
+    service_request_id,
+    theme,
+    severity,
+    policy_title,
+    source_url,
+    original_action AS before_action,
+    refined_action  AS after_action,
+    alignment
+  FROM `%s.%s.batch_triage_policy_refined_v2`
+  WHERE alignment IN ('mismatch-corrected')
+  ORDER BY service_request_id
+  LIMIT 25
+""", project_id, dataset, project_id, dataset);
