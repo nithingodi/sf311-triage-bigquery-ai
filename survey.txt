@@ -1,0 +1,3 @@
+BigQuery AI: ~1 month
+GCP: ~4 months
+Feedback: SQL-first approach worked well; needs fuller policy corpus and streaming in future.
