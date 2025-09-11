@@ -4,37 +4,33 @@
 --   Produce final, policy-aligned actions:
 --     (A) Rows WITH a matched policy → LLM refinement with alignment tagging.
 --     (B) Rows WITHOUT a policy      → pass-through action, alignment='no_policy'.
--- Inputs:
---   - sf311.triage_todo_v2                (from 07_refine_prep.sql)
---   - us_gemini_conn (CLOUD_RESOURCE)     (Vertex AI access)
 -- Outputs:
---   - APPEND rows into sf311.batch_triage_policy_refined_v2
--- Idempotency:
---   - Skips service_request_ids already present in final table.
--- Parameters: project/dataset/connection/endpoint/run_limit
+--   APPEND rows into batch_triage_policy_refined_v2
+-- Idempotency: Skips already-processed IDs.
 
 -- ===========
 -- PARAMETERS
 -- ===========
-DECLARE project_id   STRING  DEFAULT 'sf311-triage-2025';
-DECLARE dataset      STRING  DEFAULT 'sf311';
-DECLARE gem_conn_id  STRING  DEFAULT 'us_gemini_conn';
-DECLARE endpoint     STRING  DEFAULT 'gemini-2.0-flash-001';
-DECLARE run_limit    INT64   DEFAULT 200;   -- throttle; raise/remove for full runs
+DECLARE project_id  STRING DEFAULT "@PROJECT_ID";
+DECLARE dataset     STRING DEFAULT "@DATASET";
+DECLARE gem_conn_id STRING DEFAULT "@GEM_CONN_ID";
+DECLARE endpoint    STRING DEFAULT "@GEN_ENDPOINT";
+DECLARE run_limit   INT64  DEFAULT 200;
 
--- 07_refinement.sql
-
+-- ==========================================================
 -- A) WITH a matched policy → refine via LLM
-INSERT INTO `sf311-triage-2025.sf311.batch_triage_policy_refined_v2`
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+INSERT INTO `%s.%s.batch_triage_policy_refined_v2`
 (service_request_id, summary, summary_source, theme, severity, original_action,
  policy_title, policy_snippet, source_url, refined_action, alignment)
 WITH todo AS (
   SELECT t.*
-  FROM `sf311-triage-2025.sf311.triage_todo_v2` t
-  LEFT JOIN `sf311-triage-2025.sf311.batch_triage_policy_refined_v2` e USING (service_request_id)
+  FROM `%s.%s.triage_todo_v2` t
+  LEFT JOIN `%s.%s.batch_triage_policy_refined_v2` e USING (service_request_id)
   WHERE t.policy_title IS NOT NULL AND e.service_request_id IS NULL
   ORDER BY t.service_request_id
-  LIMIT 200
+  LIMIT %d
 ),
 calls AS (
   SELECT
@@ -49,8 +45,8 @@ calls AS (
         'Policy: ', COALESCE(t.policy_snippet,'(null)'), ' ',
         'Original action: ', COALESCE(t.original_action,'(null)')
       ),
-      connection_id => 'projects/sf311-triage-2025/locations/US/connections/us_gemini_conn',
-      endpoint      => 'gemini-2.0-flash-001',
+      connection_id => FORMAT('projects/%s/locations/US/connections/%s', project_id, '%s'),
+      endpoint      => '%s',
       model_params  => JSON '{"generation_config":{"temperature":0,"response_mime_type":"application/json"}}'
     ).result AS gen_text
   FROM todo t
@@ -80,9 +76,17 @@ SELECT
     WHEN 'match'    THEN 'match'
     ELSE 'match'
   END AS alignment;
+""", project_id, dataset,
+     project_id, dataset,
+     project_id, dataset,
+     run_limit,
+     project_id, gem_conn_id, endpoint);
 
+-- ==========================================================
 -- B) NO policy → pass-through with 'no_policy'
-INSERT INTO `sf311-triage-2025.sf311.batch_triage_policy_refined_v2`
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+INSERT INTO `%s.%s.batch_triage_policy_refined_v2`
 (service_request_id, summary, summary_source, theme, severity, original_action,
  policy_title, policy_snippet, source_url, refined_action, alignment)
 SELECT
@@ -99,8 +103,10 @@ SELECT
   t.source_url,
   t.original_action AS refined_action,
   'no_policy'      AS alignment
-FROM `sf311-triage-2025.sf311.triage_todo_v2` t
-LEFT JOIN `sf311-triage-2025.sf311.batch_triage_policy_refined_v2` e USING (service_request_id)
+FROM `%s.%s.triage_todo_v2` t
+LEFT JOIN `%s.%s.batch_triage_policy_refined_v2` e USING (service_request_id)
 WHERE t.policy_title IS NULL
   AND e.service_request_id IS NULL;
-
+""", project_id, dataset,
+     project_id, dataset,
+     project_id, dataset);
