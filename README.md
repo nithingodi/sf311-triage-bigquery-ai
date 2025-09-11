@@ -128,3 +128,37 @@ No full streaming pipeline; batch-only for Kaggle scope.
 
 ## 📑 License
 MIT
+
+
+
+## To run
+
+```bash
+# ==== 0) Set your GCP project & unique bucket ====
+MY_PROJECT="<YOUR_GCP_PROJECT_ID>"      # <- replace this
+MY_BUCKET="sf311-triage-$RANDOM-data"   # must be globally unique
+
+gcloud config set project "$MY_PROJECT"
+
+# ==== 1) Clone the repo ====
+cd ~
+git clone https://github.com/nithingodi/sf311-triage-bigquery-ai.git
+cd sf311-triage-bigquery-ai
+
+# ==== 2) Patch bootstrap with project & bucket ====
+sed -i -E "s|^PROJECT_ID=\"[^\"]*\"|PROJECT_ID=\"$MY_PROJECT\"|" scripts/00_bootstrap.sh
+sed -i -E "s|^BUCKET_NAME=\"[^\"]*\"|BUCKET_NAME=\"$MY_BUCKET\"|" scripts/00_bootstrap.sh
+
+# ==== 3) Bootstrap environment ====
+bash scripts/00_bootstrap.sh
+
+# ==== 4) Run the pipeline (02 → 10) via Makefile ====
+make run_all FROM=02
+
+# ==== 5) (Optional) Export charts ====
+mkdir -p exports
+bq query --nouse_legacy_sql 'SELECT * FROM `'"$MY_PROJECT"'.sf311.v_proto_comparison_metrics`' > exports/proto_metrics.csv
+bq query --nouse_legacy_sql 'SELECT * FROM `'"$MY_PROJECT"'.sf311.v_alignment_pie`'          > exports/alignment_pie.csv
+bq query --nouse_legacy_sql 'SELECT * FROM `'"$MY_PROJECT"'.sf311.v_mismatch_examples`'      > exports/mismatch_examples.csv
+```
+
