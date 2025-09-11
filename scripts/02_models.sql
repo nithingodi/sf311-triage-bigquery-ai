@@ -2,20 +2,19 @@
 -- Script: 02_models.sql
 -- Purpose: Define BigQuery REMOTE models for Generative AI and Text Embeddings via an existing connection.
 -- Inputs: Existing BigQuery connection (CLOUD_RESOURCE) that has Vertex AI access (roles/aiplatform.user).
--- Outputs: sf311.gemini_text (REMOTE), sf311.embed_text (REMOTE).
+-- Outputs: ${DATASET}.gemini_text (REMOTE), ${DATASET}.embed_text (REMOTE).
 -- Idempotency: CREATE OR REPLACE MODEL (safe to re-run).
--- Parameters: Set your project/dataset/location/connection/model endpoints below.
--- Next: 02_views.sql (creates normalized and cleaned complaint text views).
+-- Parameters: PROJECT_ID, DATASET, LOCATION, GEM_CONN_ID, GEN_ENDPOINT, EMB_ENDPOINT
 
 -- ===========
 -- PARAMETERS
 -- ===========
-DECLARE project_id  STRING DEFAULT 'sf311-triage-2025';
-DECLARE dataset     STRING DEFAULT 'sf311';
-DECLARE location    STRING DEFAULT 'US';
-DECLARE gem_conn_id STRING DEFAULT 'us_gemini_conn';
-DECLARE gen_endpoint STRING DEFAULT 'gemini-2.0-flash-001';
-DECLARE emb_endpoint STRING DEFAULT 'text-embedding-005';
+DECLARE project_id   STRING DEFAULT "@PROJECT_ID";
+DECLARE dataset      STRING DEFAULT "@DATASET";
+DECLARE location     STRING DEFAULT "@LOCATION";
+DECLARE gem_conn_id  STRING DEFAULT "@GEM_CONN_ID";
+DECLARE gen_endpoint STRING DEFAULT "@GEN_ENDPOINT";
+DECLARE emb_endpoint STRING DEFAULT "@EMB_ENDPOINT";
 
 -- ================================
 -- Generative REMOTE model (Gemini)
