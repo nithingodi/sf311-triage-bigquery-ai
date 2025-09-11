@@ -2,36 +2,25 @@
 set -euo pipefail
 
 # ==========================================================
-# Project: City311 Multimodal Triage with BigQuery AI
-# Script: 00_bootstrap.sh
-# Purpose: Provision GCP primitives used by the SQL-only pipeline:
-#          - BigQuery dataset
-#          - GCS bucket
-#          - BigQuery connections (Gemini & GCS)
-#          - Minimal view + External Object Table
-#          - Sanity smoke run with AI.GENERATE
-# Idempotency: Safe to re-run; will no-op when resources exist.
-# Prereqs:
-#   - gcloud, bq, jq, curl installed
-#   - gcloud auth login (or a configured service account)
-#   - Billing enabled on the project
+# 00_bootstrap.sh — provision dataset, bucket, connections, IAM, sanity checks
 # ==========================================================
 
-# ====== PARAMETERS (injected from Makefile, with safe defaults) ======
-PROJECT_ID="${PROJECT_ID:-sf311-triage-2025}"
-LOCATION="${LOCATION:-US}"                  
+# ---------- Config (env or defaults) ----------
+PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+LOCATION="${LOCATION:-US}"
 DATASET="${DATASET:-sf311}"
-BUCKET_NAME="${BUCKET_NAME:-${PROJECT_ID}-data}"   # unique bucket name per project
+BUCKET_NAME="${BUCKET_NAME:-${PROJECT_ID}-data}"   # unique-ish per project
 GEM_CONN_ID="${GEM_CONN_ID:-us_gemini_conn}"
-GCS_CONN_ID="${GCS_CONN_ID:-sf311_gcs_conn}"
-GEM_MODEL_ENDPOINT="${GEN_ENDPOINT:-gemini-2.0-flash-001}"   # note: from Makefile GEN_ENDPOINT
-# ==========================================================
+GCS_CONN_ID="${GCS_CONN_ID:-${DATASET}_gcs_conn}"
+GEN_ENDPOINT="${GEN_ENDPOINT:-gemini-2.0-flash-001}"
 
-# ---- Preflight checks ----
-command -v gcloud >/dev/null || { echo "gcloud not found"; exit 1; }
-command -v bq >/dev/null     || { echo "bq not found"; exit 1; }
-command -v jq >/dev/null     || { echo "jq not found"; exit 1; }
-command -v curl >/dev/null   || { echo "curl not found"; exit 1; }
+if [[ -z "${PROJECT_ID}" ]]; then
+  echo "❌ PROJECT_ID is empty. Set via \`gcloud config set project <id>\` or env."
+  exit 1
+fi
+
+# ---------- Tools ----------
+for t in gcloud bq jq curl; do command -v "$t" >/dev/null || { echo "Missing $t"; exit 1; }; done
 
 echo "== Setup: project & APIs =="
 gcloud config set project "$PROJECT_ID" >/dev/null
@@ -51,14 +40,11 @@ gcloud storage buckets create "gs://${BUCKET_NAME}" \
   --uniform-bucket-level-access \
   2>/dev/null || echo "Bucket exists"
 
-echo "== BigQuery connections (CLOUD_RESOURCE) =="
+echo "== BigQuery CLOUD_RESOURCE connections =="
 bq --project_id="$PROJECT_ID" --location="$LOCATION" mk --connection \
-  --connection_type=CLOUD_RESOURCE --display_name="Gemini" "$GEM_CONN_ID" \
-  2>/dev/null || echo "$GEM_CONN_ID exists"
-
+  --connection_type=CLOUD_RESOURCE --display_name="Gemini" "$GEM_CONN_ID" 2>/dev/null || echo "$GEM_CONN_ID exists"
 bq --project_id="$PROJECT_ID" --location="$LOCATION" mk --connection \
-  --connection_type=CLOUD_RESOURCE --display_name="GCS" "$GCS_CONN_ID" \
-  2>/dev/null || echo "$GCS_CONN_ID exists"
+  --connection_type=CLOUD_RESOURCE --display_name="GCS" "$GCS_CONN_ID"   2>/dev/null || echo "$GCS_CONN_ID exists"
 
 echo "== Fetch connection service accounts =="
 GEM_SA="$(bq --project_id="$PROJECT_ID" --location="$LOCATION" show --connection --format=json "$GEM_CONN_ID" | jq -r '.cloudResource.serviceAccountId')"
@@ -66,18 +52,32 @@ GCS_SA="$(bq --project_id="$PROJECT_ID" --location="$LOCATION" show --connection
 echo "Gemini SA: ${GEM_SA}"
 echo "GCS SA:    ${GCS_SA}"
 
-echo "== Grant IAM =="
+echo "== Grant IAM to bucket and Vertex AI =="
+# Bucket read for GCS connection
 gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
-  --member="serviceAccount:${GCS_SA}" \
-  --role="roles/storage.objectViewer" \
-  >/dev/null || true
+  --member="serviceAccount:${GCS_SA}" --role="roles/storage.objectViewer" >/dev/null || true
 
+# Vertex AI User for Gemini connection SA
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${GEM_SA}" \
-  --role="roles/aiplatform.user" \
-  >/dev/null || true
+  --member="serviceAccount:${GEM_SA}" --role="roles/aiplatform.user" >/dev/null || true
 
-echo "== Minimal normalized view over the public SF311 table =="
+# ---- AI.GENERATE: grant to BigQuery agents (project-agnostic) ----
+PROJ_NUM="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+BQ_SA="service-${PROJ_NUM}@gcp-sa-bigquery.iam.gserviceaccount.com"
+BQ_CONDEL_SA_STD="service-${PROJ_NUM}@gcp-sa-bigquery-condel.iam.gserviceaccount.com"
+
+for SA in "$BQ_SA" "$BQ_CONDEL_SA_STD"; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${SA}" --role="roles/aiplatform.user" >/dev/null || true
+done
+
+# Optional: if your org yields a bqcx-* condel SA, allow override via env
+if [[ -n "${BQ_BQCX_CONDEL_SA:-}" ]]; then
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${BQ_BQCX_CONDEL_SA}" --role="roles/aiplatform.user" >/dev/null || true
+fi
+
+echo "== Minimal normalized view over public SF311 table =="
 bq --location="$LOCATION" query --use_legacy_sql=false "
 CREATE OR REPLACE VIEW \`${PROJECT_ID}.${DATASET}.cases_norm\` AS
 SELECT
@@ -92,7 +92,6 @@ FROM \`bigquery-public-data.san_francisco_311.311_service_requests\`;
 
 echo "== External Object Table over images prefix =="
 gcloud storage cp -n /dev/null "gs://${BUCKET_NAME}/sf311_cohort/images/.keep" >/dev/null || true
-
 bq --location="$LOCATION" query --use_legacy_sql=false <<SQL
 CREATE OR REPLACE EXTERNAL TABLE \`${PROJECT_ID}.${DATASET}.images_obj_cohort\`
 WITH CONNECTION \`projects/${PROJECT_ID}/locations/${LOCATION}/connections/${GCS_CONN_ID}\`
@@ -102,18 +101,17 @@ OPTIONS (
 );
 SQL
 
-echo "== Sanity check: list a few objects (may be empty except .keep) =="
+echo "== Sanity check objects =="
 bq --location="$LOCATION" query --use_legacy_sql=false "
 SELECT uri, content_type, size
 FROM \`${PROJECT_ID}.${DATASET}.images_obj_cohort\`
 LIMIT 5;
 "
 
-echo "== Optional smoke: upload one real image & summarize with AI.GENERATE =="
+echo "== Optional smoke: upload + summarize image =="
 TMP_IMG="/tmp/test_wiki.jpg"
 curl -fsSL -o "\$TMP_IMG" "https://upload.wikimedia.org/wikipedia/commons/3/3f/Fronalpstock_big.jpg"
 gcloud storage cp --content-type="image/jpeg" "\$TMP_IMG" "gs://${BUCKET_NAME}/sf311_cohort/images/test_wiki.jpg" >/dev/null
-
 bq --location="$LOCATION" query --use_legacy_sql=false "
 SELECT
   uri,
@@ -123,7 +121,7 @@ SELECT
       OBJ.GET_ACCESS_URL(ref, 'r')
     ),
     connection_id => 'projects/${PROJECT_ID}/locations/${LOCATION}/connections/${GEM_CONN_ID}',
-    endpoint      => '${GEM_MODEL_ENDPOINT}',
+    endpoint      => '${GEN_ENDPOINT}',
     model_params  => JSON '{\"generation_config\":{\"temperature\":0}}'
   ).result AS summary
 FROM \`${PROJECT_ID}.${DATASET}.images_obj_cohort\`
