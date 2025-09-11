@@ -1,15 +1,20 @@
 # ==========================================================
-# Project: City311 Multimodal Triage with BigQuery AI
-# Makefile (parameterized)
+# City311 Multimodal Triage with BigQuery AI — Makefile
 # ==========================================================
 
-PROJECT_ID :=
-DATASET    := sf311
-LOCATION   := US
-GEM_CONN_ID := us_gemini_conn
-GEN_ENDPOINT := gemini-2.0-flash-001
+# Auto-detect PROJECT_ID from gcloud if not supplied.
+PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
 
-.PHONY: all prepare_dirs run_all exports validate quick clean
+ifeq ($(strip $(PROJECT_ID)),)
+$(error PROJECT_ID is empty. Run `gcloud config set project <id>` or `make run_all PROJECT_ID=<id>`)
+endif
+
+DATASET      ?= sf311
+LOCATION     ?= US
+GEM_CONN_ID  ?= us_gemini_conn
+GEN_ENDPOINT ?= gemini-2.0-flash-001
+
+.PHONY: all prepare_dirs run_all exports validate quick clean print-config
 
 all: prepare_dirs run_all
 
@@ -35,8 +40,10 @@ SQLS = \
   scripts/10_validation.sql
 
 run_all:
-	@echo "== Bootstrapping GCP project =="
-	bash scripts/00_bootstrap.sh
+	@echo "== Bootstrapping GCP project ($(PROJECT_ID)) =="
+	PROJECT_ID=$(PROJECT_ID) DATASET=$(DATASET) LOCATION=$(LOCATION) \
+	GEM_CONN_ID=$(GEM_CONN_ID) GEN_ENDPOINT=$(GEN_ENDPOINT) \
+	  bash scripts/00_bootstrap.sh
 	@echo "== Running SQL scripts in order =="
 	@set -e; \
 	for f in $(SQLS); do \
@@ -53,17 +60,15 @@ run_all:
 
 exports:
 	@mkdir -p exports
-	bq query --nouse_legacy_sql --format=csv \
-	  --parameter=PROJECT_ID::STRING=$(PROJECT_ID) \
-	  --parameter=DATASET::STRING=$(DATASET) \
+	bq --project_id=$(PROJECT_ID) query --nouse_legacy_sql --format=csv \
 	  "SELECT * FROM \`$(PROJECT_ID).$(DATASET).v_proto_comparison_metrics\`" > exports/proto_metrics.csv
-	bq query --nouse_legacy_sql --format=csv \
+	bq --project_id=$(PROJECT_ID) query --nouse_legacy_sql --format=csv \
 	  "SELECT * FROM \`$(PROJECT_ID).$(DATASET).v_alignment_pie\`" > exports/alignment_pie.csv
-	bq query --nouse_legacy_sql --format=csv \
+	bq --project_id=$(PROJECT_ID) query --nouse_legacy_sql --format=csv \
 	  "SELECT * FROM \`$(PROJECT_ID).$(DATASET).v_mismatch_examples\`" > exports/mismatch_examples.csv
 
 validate:
-	bq query --nouse_legacy_sql \
+	bq --project_id=$(PROJECT_ID) query --nouse_legacy_sql \
 	  --parameter=PROJECT_ID::STRING=$(PROJECT_ID) \
 	  --parameter=DATASET::STRING=$(DATASET) \
 	  < scripts/10_validation.sql
@@ -72,3 +77,10 @@ quick: run_all validate exports
 
 clean:
 	rm -f exports/*.csv
+
+print-config:
+	@echo "PROJECT_ID=$(PROJECT_ID)"
+	@echo "DATASET=$(DATASET)"
+	@echo "LOCATION=$(LOCATION)"
+	@echo "GEM_CONN_ID=$(GEM_CONN_ID)"
+	@echo "GEN_ENDPOINT=$(GEN_ENDPOINT)"
