@@ -1,24 +1,20 @@
 -- Project: City311 Multimodal Triage with BigQuery AI
 -- Script: 05_policy_catalog.sql
 -- Purpose: Seed a lightweight policy/pattern catalog used for vector matching & action alignment.
--- Inputs:  (optional) sf311.label_taxonomy for validation (created in 05_label_taxonomy.sql)
--- Outputs: TABLE sf311.policy_chunks
---          VIEW  sf311.policy_chunks_validation  (flags themes not in taxonomy)
+-- Outputs: policy_chunks (TABLE), policy_chunks_validation (VIEW)
 -- Idempotency: CREATE OR REPLACE (safe).
--- Next: 06_matching.sql (embed policies & complaints, vector search for best policy)
 
 -- ===========
 -- PARAMETERS
 -- ===========
-DECLARE project_id STRING DEFAULT 'sf311-triage-2025';
-DECLARE dataset    STRING DEFAULT 'sf311';
+DECLARE project_id STRING DEFAULT "@PROJECT_ID";
+DECLARE dataset    STRING DEFAULT "@DATASET";
 
 -- =========================
 -- Seed policy chunks table
 -- =========================
--- 05_policy_catalog.sql (named fields; idempotent)
-
-CREATE OR REPLACE TABLE `sf311-triage-2025.sf311.policy_chunks` AS
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE TABLE `%s.%s.policy_chunks` AS
 SELECT policy_id, title, chunk_text, source_url, target_theme
 FROM UNNEST([
   STRUCT('PARK_HYDRANT'  AS policy_id, 'Fire Hydrants' AS title,
@@ -81,7 +77,6 @@ FROM UNNEST([
         'https://www.sf.gov/request-street-or-sidewalk-cleaning' AS source_url,
         'Human/Animal Waste' AS target_theme),
 
-  -- Extra chunks you added later:
   STRUCT('pw_waste_001' AS policy_id, 'Human/Animal Waste – Public Right of Way' AS title,
         'Public Works responds to reports of human or animal waste in the public right of way submitted via 311. Provide exact location and nearest cross street.' AS chunk_text,
         'https://sfpublicworks.org/services/garbage-and-waste' AS source_url,
@@ -92,14 +87,17 @@ FROM UNNEST([
         'https://sfpublicworks.org/services/report-problem' AS source_url,
         'Human/Animal Waste' AS target_theme)
 ]) AS t;
+""", project_id, dataset);
 
--- Keep validation as a VIEW to avoid table/view collisions
-CREATE OR REPLACE VIEW `sf311-triage-2025.sf311.policy_chunks_validation` AS
+-- =========================
+-- Validation view
+-- =========================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE VIEW `%s.%s.policy_chunks_validation` AS
 SELECT
   pc.policy_id, pc.title, pc.target_theme,
   CASE WHEN lt.theme IS NULL THEN 'missing_in_taxonomy' ELSE 'ok' END AS theme_status
-FROM `sf311-triage-2025.sf311.policy_chunks` pc
-LEFT JOIN `sf311-triage-2025.sf311.label_taxonomy` lt
+FROM `%s.%s.policy_chunks` pc
+LEFT JOIN `%s.%s.label_taxonomy` lt
   ON LOWER(pc.target_theme) = LOWER(lt.theme);
-SQL
-
+""", project_id, dataset, project_id, dataset, project_id, dataset);
