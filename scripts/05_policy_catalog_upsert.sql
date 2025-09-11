@@ -17,39 +17,60 @@ EXECUTE IMMEDIATE FORMAT("""
 MERGE `%s.%s.policy_chunks` T
 USING (
   SELECT * FROM UNNEST([
-    STRUCT('recology_bulky_001','Bulky Item Recycling – Residential Allotment',
-      'San Francisco residential customers receive a limited number of no-charge curbside bulky item collections. Place items by 6am and label “Recology.”',
-      'https://www.recology.com/recology-san-francisco/bulky-items/','Bulky Items'),
-    STRUCT('recology_bulky_002','Bulky Item Recycling – Scheduling & Day-of Rules',
-      'After scheduling, set items curbside by 6am and attach a sign marked “Recology.” Program rules and eligibility apply.',
-      'https://www.recology.com/faq/sf-bulky-item-collection/','Bulky Items'),
-    STRUCT('sf_illegal_dumping_001','Illegal Dumping – 311 Routing',
-      '311 routes illegal dumping to Public Works or Recology depending on material and location.',
-      'https://www.sf.gov/report-illegal-dumping-activity','Illegal Dumping'),
-    STRUCT('sf_illegal_dumping_002','Illegal Dumping – Assignment Overview',
-      'City process describes assignment/completion steps across agencies.',
-      'https://media.api.sf.gov/documents/Illegal_Dumping_Final_Report.pdf','Illegal Dumping'),
-    STRUCT('pw_graffiti_public_001','Graffiti on Public Property – Response',
-      'Public Works paints out graffiti on public property; report via 311.',
-      'https://sfpublicworks.org/services/graffiti','Vandalism'),
-    STRUCT('pw_graffiti_private_002','Graffiti on Private Property – 30-Day Abatement',
-      'Owners must remove graffiti within 30 days of notice per Article 23.',
-      'https://sfpublicworks.org/services/graffiti-private-property','Vandalism'),
-    STRUCT('sf_sidewalk_001','Sidewalk/Curb Problems – Reporting & Responsibility',
-      'Report cracked, lifted, or defective sidewalks/curbs via 311.',
-      'https://www.sf.gov/report-curb-and-sidewalk-problems','Street/Sidewalk Defect'),
-    STRUCT('pw_sidewalk_permit_002','Sidewalk Repair – Permit & Contractor Requirements',
-      'Use licensed A or C-8 contractor and secure required permits/bonds.',
-      'https://sfpublicworks.org/services/permits/sidewalk-repair','Street/Sidewalk Defect'),
-    STRUCT('sfmta_abandoned_001','Abandoned Vehicle – 72-Hour Rule',
-      'Vehicles left >72 hours may be cited or towed; report suspected abandoned vehicles via 311.',
-      'https://www.sfmta.com/getting-around/drive-park/towed-vehicles','Abandoned Vehicle'),
-    STRUCT('sf_streetlight_001','Streetlight Problems – What to Report',
-      'Report streetlights that are out, flickering, dim, always on, or with exposed wires.',
-      'https://www.sf.gov/report-problem-streetlight','Streetlight Out'),
-    STRUCT('hsoc_001','Encampments – Coordinated Response (HSOC)',
-      'HSOC coordinates phased approach; 311 routes non-encampment issues to Public Works.',
-      'https://sfcontroller.org/sites/default/files/Documents/Auditing/Review%20of%20the%20Healthy%20Streets%20Operations%20Center.pdf','Encampment')
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('recology_bulky_001','Bulky Item Recycling - Residential Allotment',
+       'San Francisco residential customers receive a limited number of no-charge curbside bulky item collections.',
+       'https://www.recology.com/recology-san-francisco/bulky-items/','Bulky Items'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('recology_bulky_002','Bulky Item Recycling - Scheduling & Day-of Rules',
+       'After scheduling, set items curbside by 6am and attach a sign marked "Recology." Program rules and eligibility apply.',
+       'https://www.recology.com/faq/sf-bulky-item-collection/','Bulky Items'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('sf_illegal_dumping_001','Illegal Dumping - 311 Routing',
+       '311 routes illegal dumping to Public Works or Recology depending on material and location.',
+       'https://www.sf.gov/report-illegal-dumping-activity','Illegal Dumping'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('sf_illegal_dumping_002','Illegal Dumping - Assignment Overview',
+       'City process describes assignment and completion steps across agencies.',
+       'https://media.api.sf.gov/documents/Illegal_Dumping_Final_Report.pdf','Illegal Dumping'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('pw_graffiti_public_001','Graffiti on Public Property - Response',
+       'Public Works paints out graffiti on public property; report via 311.',
+       'https://sfpublicworks.org/services/graffiti','Vandalism'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('pw_graffiti_private_002','Graffiti on Private Property - 30-Day Abatement',
+       'Owners must remove graffiti within 30 days of notice per Article 23.',
+       'https://sfpublicworks.org/services/graffiti-private-property','Vandalism'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('sf_sidewalk_001','Sidewalk/Curb Problems - Reporting & Responsibility',
+       'Report cracked, lifted, or defective sidewalks or curbs via 311.',
+       'https://www.sf.gov/report-curb-and-sidewalk-problems','Street/Sidewalk Defect'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('pw_sidewalk_permit_002','Sidewalk Repair - Permit & Contractor Requirements',
+       'Use licensed A or C-8 contractor and secure required permits and bonds.',
+       'https://sfpublicworks.org/services/permits/sidewalk-repair','Street/Sidewalk Defect'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('sfmta_abandoned_001','Abandoned Vehicle - 72-Hour Rule',
+       'Vehicles left more than 72 hours may be cited or towed; report suspected abandoned vehicles via 311.',
+       'https://www.sfmta.com/getting-around/drive-park/towed-vehicles','Abandoned Vehicle'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('sf_streetlight_001','Streetlight Problems - What to Report',
+       'Report streetlights that are out, flickering, dim, always on, or with exposed wires.',
+       'https://www.sf.gov/report-problem-streetlight','Streetlight Out'),
+
+    STRUCT<policy_id STRING, title STRING, chunk_text STRING, source_url STRING, target_theme STRING>
+      ('hsoc_001','Encampments - Coordinated Response (HSOC)',
+       'HSOC coordinates a phased approach; 311 routes non-encampment issues to Public Works.',
+       'https://sfcontroller.org/sites/default/files/Documents/Auditing/Review%20of%20the%20Healthy%20Streets%20Operations%20Center.pdf','Encampment')
   ])
 ) S
 ON T.policy_id = S.policy_id
@@ -59,7 +80,7 @@ WHEN NOT MATCHED THEN
 """, project_id, dataset);
 
 -- =========================
--- Validation view
+-- Validation view (kept in sync)
 -- =========================
 EXECUTE IMMEDIATE FORMAT("""
 CREATE OR REPLACE VIEW `%s.%s.policy_chunks_validation` AS
