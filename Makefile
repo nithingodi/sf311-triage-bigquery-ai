@@ -1,6 +1,6 @@
-PROJECT_ID ?= sf311-triage-2025
-DATASET    ?= sf311
-LOCATION   ?= US
+PROJECT_ID :=
+DATASET    := sf311
+LOCATION   := US
 
 .PHONY: all prepare_dirs run_all exports validate quick clean
 
@@ -26,16 +26,28 @@ SQLS = \
   scripts/09_proto_comparison.sql
 
 run_all:
+	@if [ -z "$(PROJECT_ID)" ]; then \
+		echo "ERROR: You must provide PROJECT_ID, e.g. make run_all PROJECT_ID=my-gcp-project"; \
+		exit 1; \
+	fi
 	@echo "== Bootstrapping GCP project =="
 	bash scripts/00_bootstrap.sh
 	@echo "== Running SQL scripts in order =="
 	@set -e; \
 	for f in $(SQLS); do \
 		echo "Running $$f"; \
-		bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query --use_legacy_sql=false < $$f; \
+		bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query \
+		   --use_legacy_sql=false \
+		   --parameter=PROJECT_ID::$(PROJECT_ID) \
+		   --parameter=DATASET::$(DATASET) \
+		   < $$f; \
 	done
 
 exports:
+	@if [ -z "$(PROJECT_ID)" ]; then \
+		echo "ERROR: You must provide PROJECT_ID, e.g. make exports PROJECT_ID=my-gcp-project"; \
+		exit 1; \
+	fi
 	@mkdir -p exports
 	bq query --nouse_legacy_sql --format=csv \
 	  "SELECT * FROM \`$(PROJECT_ID).$(DATASET).v_proto_comparison_metrics\`" > exports/proto_metrics.csv
@@ -45,7 +57,13 @@ exports:
 	  "SELECT * FROM \`$(PROJECT_ID).$(DATASET).v_mismatch_examples\`" > exports/mismatch_examples.csv
 
 validate:
-	bq query --nouse_legacy_sql < scripts/10_validation.sql
+	@if [ -z "$(PROJECT_ID)" ]; then \
+		echo "ERROR: You must provide PROJECT_ID, e.g. make validate PROJECT_ID=my-gcp-project"; \
+		exit 1; \
+	fi
+	bq query --nouse_legacy_sql \
+	  --parameter=PROJECT_ID::$(PROJECT_ID) --parameter=DATASET::$(DATASET) \
+	  < scripts/10_validation.sql
 
 quick: run_all validate exports
 
