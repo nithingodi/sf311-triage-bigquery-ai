@@ -4,31 +4,34 @@ set -euo pipefail
 # ==========================================================
 # Project: City311 Multimodal Triage with BigQuery AI
 # Script: 00_bootstrap.sh
-# Purpose: Provision GCP primitives used by the SQL-only pipeline
-# Idempotency: Safe to re-run; will no-op when resources exist
+# Purpose: Provision GCP primitives used by the SQL-only pipeline:
+#          - BigQuery dataset
+#          - GCS bucket
+#          - BigQuery connections (Gemini & GCS)
+#          - Minimal view + External Object Table
+#          - Sanity smoke run with AI.GENERATE
+# Idempotency: Safe to re-run; will no-op when resources exist.
+# Prereqs:
+#   - gcloud, bq, jq, curl installed
+#   - gcloud auth login (or a configured service account)
+#   - Billing enabled on the project
 # ==========================================================
 
-# ====== Require PROJECT_ID ======
-if [ -z "${PROJECT_ID:-}" ]; then
-  echo "❌ ERROR: PROJECT_ID not set."
-  echo "   Export it or pass via make, e.g.:"
-  echo "     export PROJECT_ID=my-gcp-project"
-  echo "     make run_all PROJECT_ID=$PROJECT_ID"
-  exit 1
-fi
-
-# ====== Configurable vars ======
-LOCATION="${LOCATION:-US}"                # multi-region for SF311
+# ====== PARAMETERS (injected from Makefile, with safe defaults) ======
+PROJECT_ID="${PROJECT_ID:-sf311-triage-2025}"
+LOCATION="${LOCATION:-US}"                  
 DATASET="${DATASET:-sf311}"
-BUCKET_NAME="${BUCKET_NAME:-${PROJECT_ID}-data}"   # auto-names bucket with project
+BUCKET_NAME="${BUCKET_NAME:-${PROJECT_ID}-data}"   # unique bucket name per project
 GEM_CONN_ID="${GEM_CONN_ID:-us_gemini_conn}"
-GCS_CONN_ID="${GCS_CONN_ID:-${DATASET}_gcs_conn}"
-GEM_MODEL_ENDPOINT="${GEM_MODEL_ENDPOINT:-gemini-2.0-flash-001}"
+GCS_CONN_ID="${GCS_CONN_ID:-sf311_gcs_conn}"
+GEM_MODEL_ENDPOINT="${GEN_ENDPOINT:-gemini-2.0-flash-001}"   # note: from Makefile GEN_ENDPOINT
+# ==========================================================
 
 # ---- Preflight checks ----
-for tool in gcloud bq jq curl; do
-  command -v $tool >/dev/null || { echo "$tool not found"; exit 1; }
-done
+command -v gcloud >/dev/null || { echo "gcloud not found"; exit 1; }
+command -v bq >/dev/null     || { echo "bq not found"; exit 1; }
+command -v jq >/dev/null     || { echo "jq not found"; exit 1; }
+command -v curl >/dev/null   || { echo "curl not found"; exit 1; }
 
 echo "== Setup: project & APIs =="
 gcloud config set project "$PROJECT_ID" >/dev/null
@@ -74,7 +77,7 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role="roles/aiplatform.user" \
   >/dev/null || true
 
-echo "== Minimal normalized view over SF311 public table =="
+echo "== Minimal normalized view over the public SF311 table =="
 bq --location="$LOCATION" query --use_legacy_sql=false "
 CREATE OR REPLACE VIEW \`${PROJECT_ID}.${DATASET}.cases_norm\` AS
 SELECT
@@ -99,14 +102,14 @@ OPTIONS (
 );
 SQL
 
-echo "== Sanity check objects =="
+echo "== Sanity check: list a few objects (may be empty except .keep) =="
 bq --location="$LOCATION" query --use_legacy_sql=false "
 SELECT uri, content_type, size
 FROM \`${PROJECT_ID}.${DATASET}.images_obj_cohort\`
 LIMIT 5;
 "
 
-echo "== Optional smoke: upload + summarize image =="
+echo "== Optional smoke: upload one real image & summarize with AI.GENERATE =="
 TMP_IMG="/tmp/test_wiki.jpg"
 curl -fsSL -o "\$TMP_IMG" "https://upload.wikimedia.org/wikipedia/commons/3/3f/Fronalpstock_big.jpg"
 gcloud storage cp --content-type="image/jpeg" "\$TMP_IMG" "gs://${BUCKET_NAME}/sf311_cohort/images/test_wiki.jpg" >/dev/null
