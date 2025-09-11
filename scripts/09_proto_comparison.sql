@@ -2,32 +2,25 @@
 -- Script: 09_proto_comparison.sql
 -- Purpose:
 --   Build a unified prototype pool, parse triage JSON, and produce
---   a balanced 400-case slice (200 text + 200 image) to compare:
---     - No-AI baseline (text-only)
---     - With-AI (text + image summaries)
---   Outputs chart-ready metrics for the bar chart.
--- Inputs:
---   - sf311.batch_case_summaries
---   - sf311.batch_triage_raw_v2
---   - sf311.batch_policy_matches_v2
+--   a balanced 400-case slice (200 text + 200 image) to compare AI vs no-AI.
 -- Outputs:
---   - TABLE sf311._proto_pool
---   - TABLE sf311._proto_pool_parsed
---   - TABLE sf311.prototype_1000
---   - TABLE sf311._summarized_400
---   - VIEW  sf311.v_proto_comparison_metrics
+--   _proto_pool, _proto_pool_parsed, prototype_1000, _summarized_400 (TABLES),
+--   v_proto_comparison_metrics (VIEW)
 -- Idempotency: CREATE OR REPLACE (safe)
--- Notes:
---   - The 400-case slice is constructed as 200 text + 200 image for a balanced demo.
---   - Within each source, we prioritize rows with a policy match, then closest distance.
 
-DECLARE project_id   STRING  DEFAULT 'sf311-triage-2025';
-DECLARE dataset      STRING  DEFAULT 'sf311';
+-- ===========
+-- PARAMETERS
+-- ===========
+DECLARE project_id   STRING  DEFAULT "@PROJECT_ID";
+DECLARE dataset      STRING  DEFAULT "@DATASET";
 DECLARE proto_limit  INT64   DEFAULT 1000;
 DECLARE per_source_n INT64   DEFAULT 200;   -- 200 text + 200 image
 
--- 09_proto_comparison.sql
-CREATE OR REPLACE TABLE `sf311-triage-2025.sf311._proto_pool` AS
+-- ==========================================================
+-- Build prototype pool
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE TABLE `%s.%s._proto_pool` AS
 SELECT
   s.service_request_id,
   s.summary,
@@ -38,11 +31,19 @@ SELECT
   m.source_url,
   m.cosine_distance,
   m.service_request_id IS NOT NULL AS policy_matched
-FROM `sf311-triage-2025.sf311.batch_case_summaries` s
-LEFT JOIN `sf311-triage-2025.sf311.batch_triage_raw_v2` r USING (service_request_id)
-LEFT JOIN `sf311-triage-2025.sf311.batch_policy_matches_v2` m USING (service_request_id);
+FROM `%s.%s.batch_case_summaries` s
+LEFT JOIN `%s.%s.batch_triage_raw_v2` r USING (service_request_id)
+LEFT JOIN `%s.%s.batch_policy_matches_v2` m USING (service_request_id);
+""", project_id, dataset,
+     project_id, dataset,
+     project_id, dataset,
+     project_id, dataset);
 
-CREATE OR REPLACE TABLE `sf311-triage-2025.sf311._proto_pool_parsed` AS
+-- ==========================================================
+-- Parse JSON fields
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE TABLE `%s.%s._proto_pool_parsed` AS
 SELECT
   service_request_id,
   summary,
@@ -57,37 +58,55 @@ SELECT
   target_theme,
   source_url,
   cosine_distance
-FROM `sf311-triage-2025.sf311._proto_pool`;
+FROM `%s.%s._proto_pool`;
+""", project_id, dataset);
 
-CREATE OR REPLACE TABLE `sf311-triage-2025.sf311.prototype_1000` AS
+-- ==========================================================
+-- Prototype top-N pool
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE TABLE `%s.%s.prototype_1000` AS
 SELECT *
-FROM `sf311-triage-2025.sf311._proto_pool_parsed`
+FROM `%s.%s._proto_pool_parsed`
 WHERE summary IS NOT NULL
 ORDER BY policy_matched DESC, cosine_distance ASC NULLS LAST, service_request_id
-LIMIT 1000;
+LIMIT %d;
+""", project_id, dataset,
+     project_id, dataset,
+     proto_limit);
 
--- balanced 200 text + 200 image slice for comparison
-CREATE OR REPLACE TABLE `sf311-triage-2025.sf311._summarized_400` AS
+-- ==========================================================
+-- Balanced 200 text + 200 image slice
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE TABLE `%s.%s._summarized_400` AS
 WITH ranked AS (
   SELECT
     p.*,
     ROW_NUMBER() OVER (PARTITION BY summary_source
       ORDER BY policy_matched DESC, cosine_distance ASC NULLS LAST, service_request_id) AS rn
-  FROM `sf311-triage-2025.sf311.prototype_1000` p
+  FROM `%s.%s.prototype_1000` p
   WHERE summary_source IN ('text','image')
 )
 SELECT *
 FROM ranked
-WHERE (summary_source = 'text'  AND rn <= 200)
-   OR (summary_source = 'image' AND rn <= 200);
+WHERE (summary_source = 'text'  AND rn <= %d)
+   OR (summary_source = 'image' AND rn <= %d);
+""", project_id, dataset,
+     project_id, dataset,
+     per_source_n, per_source_n);
 
-CREATE OR REPLACE VIEW `sf311-triage-2025.sf311.v_proto_comparison_metrics` AS
+-- ==========================================================
+-- Comparison metrics (view)
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE VIEW `%s.%s.v_proto_comparison_metrics` AS
 WITH text_only AS (
   SELECT 'No-AI (Text-only)' AS cohort,
          COUNT(*) AS total,
          COUNTIF(policy_matched) AS matched,
          SAFE_DIVIDE(COUNTIF(policy_matched), COUNT(*)) AS match_rate
-  FROM `sf311-triage-2025.sf311._summarized_400`
+  FROM `%s.%s._summarized_400`
   WHERE summary_source = 'text'
 ),
 ai_multi AS (
@@ -95,9 +114,11 @@ ai_multi AS (
          COUNT(*) AS total,
          COUNTIF(policy_matched) AS matched,
          SAFE_DIVIDE(COUNTIF(policy_matched), COUNT(*)) AS match_rate
-  FROM `sf311-triage-2025.sf311._summarized_400`
+  FROM `%s.%s._summarized_400`
 )
 SELECT * FROM text_only
 UNION ALL
 SELECT * FROM ai_multi;
-
+""", project_id, dataset,
+     project_id, dataset,
+     project_id, dataset);
