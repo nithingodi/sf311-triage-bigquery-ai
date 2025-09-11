@@ -2,32 +2,30 @@
 # City311 Multimodal Triage with BigQuery AI — Makefile
 # ==========================================================
 
-# -------- Defaults (reviewer can override with PROJECT_ID=...) --------
 PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
 LOCATION   ?= US
 DATASET    ?= sf311
-
-# Your historical project string that may appear in SQL files (we rewrite on the fly)
 CANONICAL_PROJECT ?= sf311-triage-2025
 
-# Guardrails
 ifeq ($(strip $(PROJECT_ID)),)
 $(error PROJECT_ID is empty. Run `gcloud config set project <id>` or pass PROJECT_ID=<id>)
 endif
 
-# -------- Helpers --------
-# RUN_SQL: streams a SQL file through sed to rewrite any hardcoded project,
-# then executes it in BigQuery (US, Standard SQL). Fails fast on error.
+PROJECT_NUMBER ?= $(shell gcloud projects describe $(PROJECT_ID) --format='value(projectNumber)' 2>/dev/null)
+
+# Stream SQL through rewrites, then run in BigQuery (US, Standard SQL)
 define RUN_SQL
   echo "== Running $(1) =="; \
   set -euo pipefail; \
   sed -e 's/`$(CANONICAL_PROJECT)\.$(DATASET)/`$(PROJECT_ID).$(DATASET)/g' \
       -e 's/\b$(CANONICAL_PROJECT)\.$(DATASET)\b/$(PROJECT_ID).$(DATASET)/g' \
+      -e 's/@PROJECT_ID/$(PROJECT_ID)/g' \
+      -e 's/<YOUR_GCP_PROJECT_ID>/$(PROJECT_ID)/g' \
+      -e 's/@PROJECT_NUMBER/$(PROJECT_NUMBER)/g' \
       "$(1)" \
   | bq query --nouse_legacy_sql --location=$(LOCATION)
 endef
 
-# Ordered list of SQL scripts to run (keeps your original flow)
 SQL_ORDER := \
   $(wildcard scripts/02_*.sql) \
   $(wildcard scripts/03_*.sql) \
@@ -38,9 +36,6 @@ SQL_ORDER := \
   $(wildcard scripts/08_*.sql) \
   $(wildcard scripts/09_*.sql)
 
-# ==========================================================
-# Targets
-# ==========================================================
 .PHONY: run_all
 run_all:
 	@echo "== Setup: project =="; gcloud config set project "$(PROJECT_ID)"
@@ -53,8 +48,6 @@ run_all:
 .PHONY: exports
 exports:
 	@echo "== (Optional) export chart-ready CSVs =="
-	@# Add your export commands here (if any). Example:
-	@# bq extract --destination_format=CSV $(PROJECT_ID):$(DATASET).some_table gs://$(PROJECT_ID)-data/exports/some_table.csv
 	@echo "(no exports defined)"
 
 .PHONY: verify
@@ -74,6 +67,4 @@ help:
 	@echo "  exports   - Optional CSV exports (edit as needed)."
 	@echo "  verify    - Quick check of models/tables."
 	@echo "  show-sql  - Print the resolved SQL run order."
-	@echo
-	@echo "Usage:"
-	@echo "  make run_all PROJECT_ID=<your-gcp-project-id>"
+	@echo ; echo "Usage: make run_all PROJECT_ID=<your-gcp-project-id>"
