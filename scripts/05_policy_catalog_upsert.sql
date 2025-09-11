@@ -1,15 +1,20 @@
 -- Project: City311 Multimodal Triage with BigQuery AI
 -- Script: 05_policy_catalog_upsert.sql
--- Purpose: Upsert (MERGE) additional policy chunks into sf311.policy_chunks
--- Inputs:  (VALUES clause below)
--- Outputs: Updated sf311.policy_chunks without duplicates
--- Idempotency: MERGE (safe to re-run)
+-- Purpose: Upsert (MERGE) additional policy chunks into policy_chunks
+-- Outputs: Updated policy_chunks (TABLE), policy_chunks_validation (VIEW)
+-- Idempotency: MERGE + CREATE OR REPLACE (safe)
 
-DECLARE project_id STRING DEFAULT 'sf311-triage-2025';
-DECLARE dataset    STRING DEFAULT 'sf311';
+-- ===========
+-- PARAMETERS
+-- ===========
+DECLARE project_id STRING DEFAULT "@PROJECT_ID";
+DECLARE dataset    STRING DEFAULT "@DATASET";
 
--- 05_policy_catalog_upsert.sql (plain)
-MERGE `sf311-triage-2025.sf311.policy_chunks` T
+-- =========================
+-- Upsert policy chunks
+-- =========================
+EXECUTE IMMEDIATE FORMAT("""
+MERGE `%s.%s.policy_chunks` T
 USING (
   SELECT * FROM UNNEST([
     STRUCT('recology_bulky_001','Bulky Item Recycling – Residential Allotment',
@@ -51,13 +56,17 @@ ON T.policy_id = S.policy_id
 WHEN NOT MATCHED THEN
   INSERT (policy_id, title, chunk_text, source_url, target_theme)
   VALUES (S.policy_id, S.title, S.chunk_text, S.source_url, S.target_theme);
+""", project_id, dataset);
 
--- Validate taxonomy alignment as a VIEW (avoid table/view clashes)
-CREATE OR REPLACE VIEW `sf311-triage-2025.sf311.policy_chunks_validation` AS
+-- =========================
+-- Validation view
+-- =========================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE VIEW `%s.%s.policy_chunks_validation` AS
 SELECT
   pc.policy_id, pc.title, pc.target_theme,
   CASE WHEN lt.theme IS NULL THEN 'missing_in_taxonomy' ELSE 'ok' END AS theme_status
-FROM `sf311-triage-2025.sf311.policy_chunks` pc
-LEFT JOIN `sf311-triage-2025.sf311.label_taxonomy` lt
+FROM `%s.%s.policy_chunks` pc
+LEFT JOIN `%s.%s.label_taxonomy` lt
   ON LOWER(pc.target_theme) = LOWER(lt.theme);
-
+""", project_id, dataset, project_id, dataset, project_id, dataset);
