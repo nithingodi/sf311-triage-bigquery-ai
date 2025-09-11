@@ -1,18 +1,20 @@
 -- Project: City311 Multimodal Triage with BigQuery AI
 -- Script: 04a_eda_theme_coverage.sql
 -- Purpose: EDA to estimate coverage using an expanded taxonomy (request_type + text heuristics).
--- Inputs:  sf311.cases_text_quality
+-- Inputs:  cases_text_quality
 -- Outputs: Resultset only (no tables). Use for writeup charts.
 -- Idempotency: N/A (read-only).
--- Notes: This is analysis-only; safe to omit in automated runs.
 
-DECLARE project_id STRING DEFAULT 'sf311-triage-2025';
-DECLARE dataset    STRING DEFAULT 'sf311';
+-- ===========
+-- PARAMETERS
+-- ===========
+DECLARE project_id STRING DEFAULT "@PROJECT_ID";
+DECLARE dataset    STRING DEFAULT "@DATASET";
 
 WITH base AS (
   SELECT
     service_request_id,
-    LOWER(text_norm)   AS t,
+    LOWER(text_norm)    AS t,
     LOWER(request_type) AS rt,
     request_type,
     text_norm
@@ -25,18 +27,18 @@ mapped AS (
     CASE
       WHEN rt LIKE 'bulky items%%'                                      THEN 'Bulky Items'
       WHEN rt LIKE 'encampment reports%%'                               THEN 'Encampment'
-      WHEN rt LIKE 'human or animal waste%%'                             THEN 'Human/Animal Waste'
-      WHEN rt LIKE 'streetlight - light_burnt_out%%'                     THEN 'Streetlight Out'
-      WHEN rt LIKE 'pavement_defect%%' OR rt LIKE 'sidewalk_defect%%'    THEN 'Street/Sidewalk Defect'
-      WHEN rt LIKE 'illegal postings%%'                                  THEN 'Illegal Postings'
-      WHEN rt LIKE 'medical waste%%' OR rt LIKE 'hazardous materials%%'  THEN 'Hazardous/Medical Waste'
-      WHEN rt LIKE 'garbage_and_debris%%'                                THEN 'Debris Removal'
-      WHEN rt LIKE 'graffiti on %%'                                      THEN 'Vandalism'
+      WHEN rt LIKE 'human or animal waste%%'                            THEN 'Human/Animal Waste'
+      WHEN rt LIKE 'streetlight - light_burnt_out%%'                    THEN 'Streetlight Out'
+      WHEN rt LIKE 'pavement_defect%%' OR rt LIKE 'sidewalk_defect%%'   THEN 'Street/Sidewalk Defect'
+      WHEN rt LIKE 'illegal postings%%'                                 THEN 'Illegal Postings'
+      WHEN rt LIKE 'medical waste%%' OR rt LIKE 'hazardous materials%%' THEN 'Hazardous/Medical Waste'
+      WHEN rt LIKE 'garbage_and_debris%%'                               THEN 'Debris Removal'
+      WHEN rt LIKE 'graffiti on %%'                                     THEN 'Vandalism'
       WHEN rt LIKE 'parking_on_sidewalk%%' 
         OR rt LIKE 'blocking_driveway_cite_only%%' 
         OR rt LIKE 'blocking_driveway_cite_tow%%' 
-        OR rt LIKE 'other_illegal_parking%%'                             THEN 'Illegal Parking'
-      WHEN rt LIKE 'abandoned vehicle%%'                                 THEN 'Abandoned Vehicle'
+        OR rt LIKE 'other_illegal_parking%%'                            THEN 'Illegal Parking'
+      WHEN rt LIKE 'abandoned vehicle%%'                                THEN 'Abandoned Vehicle'
       WHEN REGEXP_CONTAINS(t, r'\billegal dump|dump(ing)?\b|mattress|furniture')                     THEN 'Illegal Dumping'
       WHEN REGEXP_CONTAINS(t, r'\b(overflow|trash|garbage|bin|cart|litter)\b')                       THEN 'Garbage Overflow'
       WHEN REGEXP_CONTAINS(t, r'\b(missed|skipped|miss)\b.*\b(pick ?up|collection)\b')
