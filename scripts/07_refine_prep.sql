@@ -3,21 +3,22 @@
 -- Purpose:
 --   Parse LLM triage JSON and join the tuned policy match to prepare rows
 --   for policy-aware action refinement.
--- Inputs:
---   - sf311.batch_triage_raw_v2
---   - sf311.batch_case_summaries
---   - sf311.batch_policy_matches_v2  (from 06_embeddings_and_search_tuned.sql)
---   - sf311.batch_triage_policy_refined_v2 (to skip already-done rows)
 -- Outputs:
---   - TABLE sf311.triage_todo_v2
--- Idempotency: CREATE OR REPLACE (safe). Final table is untouched here.
+--   triage_todo_v2 (TABLE)
+-- Idempotency: CREATE OR REPLACE (safe). Final table untouched.
 
-DECLARE project_id STRING DEFAULT 'sf311-triage-2025';
-DECLARE dataset    STRING DEFAULT 'sf311';
-DECLARE todo_limit INT64  DEFAULT 200;  -- demo throttle
+-- ===========
+-- PARAMETERS
+-- ===========
+DECLARE project_id STRING DEFAULT "@PROJECT_ID";
+DECLARE dataset    STRING DEFAULT "@DATASET";
+DECLARE todo_limit INT64  DEFAULT 200;
 
--- 07_refine_prep.sql
-CREATE TABLE IF NOT EXISTS `sf311-triage-2025.sf311.batch_triage_policy_refined_v2` (
+-- ==========================================================
+-- Ensure refined table exists
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE TABLE IF NOT EXISTS `%s.%s.batch_triage_policy_refined_v2` (
   service_request_id STRING,
   summary            STRING,
   summary_source     STRING,
@@ -30,16 +31,21 @@ CREATE TABLE IF NOT EXISTS `sf311-triage-2025.sf311.batch_triage_policy_refined_
   refined_action     STRING,
   alignment          STRING
 );
+""", project_id, dataset);
 
-CREATE OR REPLACE TABLE `sf311-triage-2025.sf311.triage_todo_v2` AS
+-- ==========================================================
+-- Build triage_todo_v2
+-- ==========================================================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE TABLE `%s.%s.triage_todo_v2` AS
 WITH parsed AS (
   SELECT
     r.service_request_id,
     s.summary,
     s.summary_source,
     SAFE.PARSE_JSON(r.out_text) AS obj
-  FROM `sf311-triage-2025.sf311.batch_triage_raw_v2` r
-  JOIN `sf311-triage-2025.sf311.batch_case_summaries` s USING (service_request_id)
+  FROM `%s.%s.batch_triage_raw_v2` r
+  JOIN `%s.%s.batch_case_summaries` s USING (service_request_id)
 ),
 flat AS (
   SELECT
@@ -54,14 +60,18 @@ flat AS (
 joined AS (
   SELECT f.*, m.policy_title, m.policy_snippet, m.source_url
   FROM flat f
-  LEFT JOIN `sf311-triage-2025.sf311.batch_policy_matches_v2` m USING (service_request_id)
+  LEFT JOIN `%s.%s.batch_policy_matches_v2` m USING (service_request_id)
 ),
 new_only AS (
   SELECT j.*
   FROM joined j
-  LEFT JOIN `sf311-triage-2025.sf311.batch_triage_policy_refined_v2` e USING (service_request_id)
+  LEFT JOIN `%s.%s.batch_triage_policy_refined_v2` e USING (service_request_id)
   WHERE e.service_request_id IS NULL
 )
 SELECT * FROM new_only
-LIMIT 200;
-
+LIMIT todo_limit;
+""", project_id, dataset,
+     project_id, dataset,
+     project_id, dataset,
+     project_id, dataset,
+     project_id, dataset);
