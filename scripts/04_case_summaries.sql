@@ -3,31 +3,33 @@
 -- Purpose: Build a per-case summary for the active cohort:
 --          - If text quality is good, use cleaned complaint text
 --          - Else, use image summary if available
--- Inputs:  sf311.batch_ids, sf311.cases_for_classify, sf311.cases_text_quality, sf311.batch_image_summaries
--- Outputs: VIEW sf311.batch_case_summaries (service_request_id, summary, summary_source)
--- Idempotency: CREATE OR REPLACE VIEW (safe to re-run)
--- Next: 04_triage_generate.sql (LLM JSON triage)
+-- Inputs:  batch_ids, cases_for_classify, cases_text_quality, batch_image_summaries
+-- Outputs: batch_case_summaries (VIEW)
+-- Idempotency: CREATE OR REPLACE VIEW (safe)
 
 -- ===========
 -- PARAMETERS
 -- ===========
-DECLARE project_id STRING DEFAULT 'sf311-triage-2025';
-DECLARE dataset    STRING DEFAULT 'sf311';
+DECLARE project_id STRING DEFAULT "@PROJECT_ID";
+DECLARE dataset    STRING DEFAULT "@DATASET";
 
--- 04_case_summaries.sql
-CREATE OR REPLACE VIEW `sf311-triage-2025.sf311.batch_case_summaries` AS
+-- ============================
+-- View: batch_case_summaries
+-- ============================
+EXECUTE IMMEDIATE FORMAT("""
+CREATE OR REPLACE VIEW `%s.%s.batch_case_summaries` AS
 WITH ids AS (
-  SELECT service_request_id FROM `sf311-triage-2025.sf311.batch_ids`
+  SELECT service_request_id FROM `%s.%s.batch_ids`
 ),
 text_src AS (
   SELECT c.service_request_id, cf.complaint_text, q.is_bad_text
   FROM ids c
-  JOIN `sf311-triage-2025.sf311.cases_for_classify` cf USING (service_request_id)
-  JOIN `sf311-triage-2025.sf311.cases_text_quality` q USING (service_request_id)
+  JOIN `%s.%s.cases_for_classify` cf USING (service_request_id)
+  JOIN `%s.%s.cases_text_quality` q USING (service_request_id)
 ),
 img_src AS (
   SELECT service_request_id, summary_text AS image_summary
-  FROM `sf311-triage-2025.sf311.batch_image_summaries`
+  FROM `%s.%s.batch_image_summaries`
 )
 SELECT
   i.service_request_id,
@@ -44,4 +46,8 @@ SELECT
 FROM ids i
 JOIN text_src t USING (service_request_id)
 LEFT JOIN img_src i2 USING (service_request_id);
-
+""", project_id, dataset,
+     project_id, dataset,
+     project_id, dataset,
+     project_id, dataset,
+     project_id, dataset);
