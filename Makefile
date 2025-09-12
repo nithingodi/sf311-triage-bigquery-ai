@@ -1,70 +1,57 @@
-# ==========================================================
-# City311 Multimodal Triage with BigQuery AI — Makefile
-# ==========================================================
+# City311 — Makefile (v2, idempotent)
+SHELL := /bin/bash
 
+# Auto-detect project unless explicitly passed: make run_all PROJECT_ID=my-proj
 PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
 LOCATION   ?= US
 DATASET    ?= sf311
-CANONICAL_PROJECT ?= sf311-triage-2025
+BUCKET     ?= $(PROJECT_ID)-data
+CONN       ?= us_gemini_conn
 
 ifeq ($(strip $(PROJECT_ID)),)
-$(error PROJECT_ID is empty. Run `gcloud config set project <id>` or pass PROJECT_ID=<id>)
+$(error PROJECT_ID is empty. Run: gcloud config set project YOUR_PROJECT_ID)
 endif
 
-PROJECT_NUMBER ?= $(shell gcloud projects describe $(PROJECT_ID) --format='value(projectNumber)' 2>/dev/null)
+BQQ = bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query --nouse_legacy_sql --quiet
+RUN_SQL = @echo "== Running scripts/$1"; \
+          env PROJECT_ID=$(PROJECT_ID) DATASET=$(DATASET) LOCATION=$(LOCATION) BUCKET=$(BUCKET) CONN=$(CONN) \
+          envsubst < scripts/$1 | $(BQQ)
 
-# Stream SQL through rewrites, then run in BigQuery (US, Standard SQL)
-define RUN_SQL
-  echo "== Running $(1) =="; \
-  set -euo pipefail; \
-  sed -e 's/`$(CANONICAL_PROJECT)\.$(DATASET)/`$(PROJECT_ID).$(DATASET)/g' \
-      -e 's/\b$(CANONICAL_PROJECT)\.$(DATASET)\b/$(PROJECT_ID).$(DATASET)/g' \
-      -e 's/@PROJECT_ID/$(PROJECT_ID)/g' \
-      -e 's/<YOUR_GCP_PROJECT_ID>/$(PROJECT_ID)/g' \
-      -e 's/@PROJECT_NUMBER/$(PROJECT_NUMBER)/g' \
-      "$(1)" \
-  | bq query --nouse_legacy_sql --location=$(LOCATION)
-endef
+.PHONY: run_all bootstrap sql exports clean reset verify
 
-SQL_ORDER := \
-  $(wildcard scripts/02_*.sql) \
-  $(wildcard scripts/03_*.sql) \
-  $(wildcard scripts/04_*.sql) \
-  $(wildcard scripts/05_*.sql) \
-  $(wildcard scripts/06_*.sql) \
-  $(wildcard scripts/07_*.sql) \
-  $(wildcard scripts/08_*.sql) \
-  $(wildcard scripts/09_*.sql)
+run_all: bootstrap sql
 
-.PHONY: run_all
-run_all:
-	@echo "== Setup: project =="; gcloud config set project "$(PROJECT_ID)"
-	@echo "== Bootstrap (dataset, bucket, connections, IAM) =="
-	@PROJECT_ID="$(PROJECT_ID)" LOCATION="$(LOCATION)" DATASET="$(DATASET)" bash scripts/00_bootstrap.sh
-	@echo "== Execute SQL stack =="
-	@$(foreach f,$(SQL_ORDER),$(call RUN_SQL,$(f));)
-	@echo "== All SQL completed ✅ =="
+bootstrap:
+	@bash scripts/00_bootstrap.sh "$(PROJECT_ID)" "$(LOCATION)" "$(DATASET)" "$(BUCKET)" "$(CONN)"
 
-.PHONY: exports
+sql:
+	$(call RUN_SQL,02_models.sql)
+	$(call RUN_SQL,02_views.sql)
+	$(call RUN_SQL,03_quality_and_cohorts.sql)
+	$(call RUN_SQL,03_image_summaries.sql)
+	$(call RUN_SQL,04_case_summaries.sql)
+	$(call RUN_SQL,04_triage_generate_v2.sql)
+	$(call RUN_SQL,05_label_taxonomy.sql)
+	$(call RUN_SQL,05_policy_catalog_upsert.sql)
+	$(call RUN_SQL,06_embeddings_and_search_tuned.sql)
+	$(call RUN_SQL,07_refine_prep.sql)
+	$(call RUN_SQL,07_refinement.sql)
+	$(call RUN_SQL,08_dashboards.sql)
+	$(call RUN_SQL,09_proto_comparison.sql)
+
 exports:
-	@echo "== (Optional) export chart-ready CSVs =="
-	@echo "(no exports defined)"
+	@mkdir -p exports
+	@$(BQQ) 'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_proto_comparison_metrics`' > exports/proto_metrics.csv
+	@$(BQQ) 'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_alignment_pie`' > exports/alignment_pie.csv
+	@$(BQQ) 'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_mismatch_examples`' > exports/mismatch_examples.csv
+	@echo "Exports written to ./exports"
 
-.PHONY: verify
+clean:
+	-@gcloud storage buckets delete -q gs://$(BUCKET) 2>/dev/null || true
+	-@bq --project_id=$(PROJECT_ID) --location=$(LOCATION) rm -r -f -d $(PROJECT_ID):$(DATASET) || true
+	# Note: removing the BigQuery connection is optional and can be done in the console if needed.
+
+reset: clean run_all
+
 verify:
-	@echo "== Verify core artifacts =="
-	@echo "-- Models --"; bq ls --location=$(LOCATION) --models $(PROJECT_ID):$(DATASET) || true
-	@echo "-- Tables --"; bq ls $(PROJECT_ID):$(DATASET) || true
-
-.PHONY: show-sql
-show-sql:
-	@printf "%s\n" $(SQL_ORDER)
-
-.PHONY: help
-help:
-	@echo "Targets:"
-	@echo "  run_all   - Bootstrap + run all SQL in order (reviewer default)."
-	@echo "  exports   - Optional CSV exports (edit as needed)."
-	@echo "  verify    - Quick check of models/tables."
-	@echo "  show-sql  - Print the resolved SQL run order."
-	@echo ; echo "Usage: make run_all PROJECT_ID=<your-gcp-project-id>"
+	@echo "Project: $(PROJECT_ID) | Location: $(LOCATION) | Dataset: $(DATASET) | Bucket: gs://$(BUCKET) | Connection: $(CONN)"
