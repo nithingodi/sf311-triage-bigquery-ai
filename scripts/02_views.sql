@@ -1,13 +1,13 @@
 -- Project: City311 Multimodal Triage with BigQuery AI
--- Script: 02_views.sql (concat-safe version)
+-- Script: 02_views.sql
 -- Purpose: Provide normalized SF311 cases and a cleaned text view ready for classification/summarization.
 -- Idempotency: CREATE OR REPLACE VIEW (safe to re-run).
 
 -- ===========
 -- PARAMETERS
 -- ===========
-DECLARE project_id STRING DEFAULT "@PROJECT_ID";
-DECLARE dataset    STRING DEFAULT "@DATASET";
+DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
+DECLARE dataset    STRING DEFAULT '${DATASET}';
 
 -- =====================
 -- Normalized case view
