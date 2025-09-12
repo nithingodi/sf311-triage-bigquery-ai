@@ -11,8 +11,7 @@ if [[ -z "$file" || ! -f "$file" ]]; then
   exit 2
 fi
 
-# --- 1) Replace placeholders with env vars ---
-# ${PROJECT_ID}, ${DATASET}, ${LOCATION}, ${CONN}
+# Replace placeholders with env vars
 sed -E \
   -e 's/@PROJECT_ID/${PROJECT_ID}/g' \
   -e 's/@DATASET/${DATASET}/g' \
