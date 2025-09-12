@@ -1,77 +1,52 @@
--- Project: City311 Multimodal Triage with BigQuery AI
--- Script: 05_policy_catalog_upsert.sql
--- Purpose: Upsert (MERGE) additional policy chunks into policy_chunks
--- Outputs: Updated policy_chunks (TABLE), policy_chunks_validation (VIEW)
--- Idempotency: MERGE + CREATE OR REPLACE (safe)
+-- 07_refinement.sql
+DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
+DECLARE dataset    STRING DEFAULT '${DATASET}';
 
--- ===========
--- PARAMETERS
--- ===========
-DECLARE project_id STRING DEFAULT "@PROJECT_ID";
-DECLARE dataset    STRING DEFAULT "@DATASET";
-
--- =========================
--- Upsert policy chunks
--- =========================
--- MERGE additional chunks into sf311.policy_chunks (project-relative)
-MERGE `sf311.policy_chunks` T
-USING (
-  SELECT * FROM (
-    SELECT 'recology_bulky_001' AS policy_id,'Bulky Item Recycling - Residential Allotment' AS title,
-           'San Francisco residential customers receive a limited number of no-charge curbside bulky item collections.' AS chunk_text,
-           'https://www.recology.com/recology-san-francisco/bulky-items/' AS source_url,
-           'Bulky Items' AS target_theme
-    UNION ALL
-    SELECT 'recology_bulky_002','Bulky Item Recycling - Scheduling & Day-of Rules',
-           'After scheduling, set items curbside by 6am and attach a sign marked "Recology." Program rules and eligibility apply.',
-           'https://www.recology.com/faq/sf-bulky-item-collection/','Bulky Items'
-    UNION ALL
-    SELECT 'sf_illegal_dumping_001','Illegal Dumping - 311 Routing',
-           '311 routes illegal dumping to Public Works or Recology depending on material and location.',
-           'https://www.sf.gov/report-illegal-dumping-activity','Illegal Dumping'
-    UNION ALL
-    SELECT 'sf_illegal_dumping_002','Illegal Dumping - Assignment Overview',
-           'City process describes assignment and completion steps across agencies.',
-           'https://media.api.sf.gov/documents/Illegal_Dumping_Final_Report.pdf','Illegal Dumping'
-    UNION ALL
-    SELECT 'pw_graffiti_public_001','Graffiti on Public Property - Response',
-           'Public Works paints out graffiti on public property; report via 311.',
-           'https://sfpublicworks.org/services/graffiti','Vandalism'
-    UNION ALL
-    SELECT 'pw_graffiti_private_002','Graffiti on Private Property - 30-Day Abatement',
-           'Owners must remove graffiti within 30 days of notice per Article 23.',
-           'https://sfpublicworks.org/services/graffiti-private-property','Vandalism'
-    UNION ALL
-    SELECT 'sf_sidewalk_001','Sidewalk/Curb Problems - Reporting & Responsibility',
-           'Report cracked, lifted, or defective sidewalks or curbs via 311.',
-           'https://www.sf.gov/report-curb-and-sidewalk-problems','Street/Sidewalk Defect'
-    UNION ALL
-    SELECT 'pw_sidewalk_permit_002','Sidewalk Repair - Permit & Contractor Requirements',
-           'Use licensed A or C-8 contractor and secure required permits and bonds.',
-           'https://sfpublicworks.org/services/permits/sidewalk-repair','Street/Sidewalk Defect'
-    UNION ALL
-    SELECT 'sfmta_abandoned_001','Abandoned Vehicle - 72-Hour Rule',
-           'Vehicles left more than 72 hours may be cited or towed; report suspected abandoned vehicles via 311.',
-           'https://www.sfmta.com/getting-around/drive-park/towed-vehicles','Abandoned Vehicle'
-    UNION ALL
-    SELECT 'sf_streetlight_001','Streetlight Problems - What to Report',
-           'Report streetlights that are out, flickering, dim, always on, or with exposed wires.',
-           'https://www.sf.gov/report-problem-streetlight','Streetlight Out'
-    UNION ALL
-    SELECT 'hsoc_001','Encampments - Coordinated Response (HSOC)',
-           'HSOC coordinates a phased approach; 311 routes non-encampment issues to Public Works.',
-           'https://sfcontroller.org/sites/default/files/Documents/Auditing/Review%20of%20the%20Healthy%20Streets%20Operations%20Center.pdf','Encampment'
-  )
-) S
-ON T.policy_id = S.policy_id
-WHEN NOT MATCHED THEN
-  INSERT (policy_id, title, chunk_text, source_url, target_theme)
-  VALUES (S.policy_id, S.title, S.chunk_text, S.source_url, S.target_theme);
-
-CREATE OR REPLACE VIEW `sf311.policy_chunks_validation` AS
+CREATE OR REPLACE TABLE `${PROJECT_ID}.${DATASET}.batch_triage_policy_refined_v2` AS
+WITH base AS (
+  -- Make sure sr.service_request_id is selected here.
+  SELECT
+    sr.service_request_id,
+    sr.summary,
+    sr.summary_source,
+    sr.theme,
+    sr.severity,
+    sr.original_action,
+    pm.policy_title,
+    pm.policy_snippet,
+    pm.source_url
+  FROM `${PROJECT_ID}.${DATASET}.triage_results` AS sr
+  JOIN `${PROJECT_ID}.${DATASET}.policy_match_best` AS pm
+    ON sr.service_request_id = pm.service_request_id
+),
+refined AS (
+  SELECT
+    service_request_id,
+    summary,
+    summary_source,
+    theme,
+    severity,
+    original_action,
+    policy_title,
+    policy_snippet,
+    source_url,
+    AI.GENERATE_TEXT(STRUCT(CONCAT(
+      'Policy: ', policy_title, '\nSnippet: ', policy_snippet,
+      '\nComplaint: ', summary,
+      '\nOriginal action: ', original_action,
+      '\nRewrite the action to strictly follow the policy. One imperative sentence.'
+    ) AS prompt)) AS refined_action
+  FROM base
+)
 SELECT
-  pc.policy_id, pc.title, pc.target_theme,
-  CASE WHEN lt.theme IS NULL THEN 'missing_in_taxonomy' ELSE 'ok' END AS theme_status
-FROM `sf311.policy_chunks` pc
-LEFT JOIN `sf311.label_taxonomy` lt
-  ON LOWER(pc.target_theme) = LOWER(lt.theme);
+  service_request_id,
+  summary,
+  summary_source,
+  theme,
+  severity,
+  original_action,
+  policy_title,
+  policy_snippet,
+  source_url,
+  refined_action,
+  IF(REGEXP_CONTAINS(LOWER(refined_action), LOWER(SPLIT(policy_title,' ')[SAFE_OFFSET(0)])), 'aligned', 'review') AS alignment;
