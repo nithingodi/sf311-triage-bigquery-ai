@@ -32,29 +32,40 @@ gcloud services enable \
   storage.googleapis.com \
   --project="$PROJECT_ID" >/dev/null
 
+# ------------------------------
+# Dataset (idempotent)
+# ------------------------------
 echo "== Ensure dataset ${PROJECT_ID}:${DATASET} =="
 if ! bq --project_id="$PROJECT_ID" --location="$LOCATION" ls -d "${PROJECT_ID}:${DATASET}" >/dev/null 2>&1; then
-  bq --project_id="$PROJECT_ID" --location="$LOCATION" mk -d "${PROJECT_ID}:${DATASET}"
+  bq --project_id="$PROJECT_ID" --location="$LOCATION" mk -d "${PROJECT_ID}:${DATASET}" || true
 else
   echo "Dataset exists (ok)."
 fi
 
+# ------------------------------
+# Bucket (idempotent)
+# ------------------------------
 echo "== Ensure bucket gs://${BUCKET} =="
 if ! gcloud storage buckets describe "gs://${BUCKET}" --project="$PROJECT_ID" >/dev/null 2>&1; then
-  gcloud storage buckets create "gs://${BUCKET}" --project="$PROJECT_ID" --location="$LOCATION"
+  gcloud storage buckets create "gs://${BUCKET}" --project="$PROJECT_ID" --location="$LOCATION" || true
 else
   echo "Bucket exists (ok)."
 fi
 
+# ------------------------------
+# BigQuery connection (idempotent)
+# ------------------------------
 echo "== Ensure BigQuery connection ${CONN} =="
 if ! bq --project_id="$PROJECT_ID" --location="$LOCATION" show --connection "$CONN" >/dev/null 2>&1; then
   bq --project_id="$PROJECT_ID" --location="$LOCATION" mk \
-    --connection --connection_type=CLOUD_RESOURCE "$CONN"
+    --connection --connection_type=CLOUD_RESOURCE "$CONN" || true
 else
   echo "Connection exists (ok)."
 fi
 
-# Get service account for connection
+# ------------------------------
+# Grant Vertex AI role
+# ------------------------------
 GEM_SA=$(bq --project_id="$PROJECT_ID" --location="$LOCATION" show --connection --format=json "$CONN" | jq -r '.cloudResource.serviceAccountId')
 echo "Connection SA: ${GEM_SA}"
 
