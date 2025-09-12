@@ -1,4 +1,4 @@
--- Variables rendered by envsubst via Makefile
+-- 05_policy_catalog_upsert.sql
 DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
 DECLARE dataset    STRING DEFAULT '${DATASET}';
 
@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.policy_catalog` (
 MERGE `${PROJECT_ID}.${DATASET}.policy_catalog` T
 USING (
   SELECT * FROM UNNEST([
+    -- Seed examples — keep or replace with your curated rows
     STRUCT('Illegal Parking — Tow Zones' AS policy_title,
            'https://example'            AS source_url,
            'Tow if posted tow-away'     AS policy_snippet,
