@@ -1,21 +1,7 @@
--- Project: City311 Multimodal Triage with BigQuery AI
--- Script: 04_case_summaries.sql
--- Purpose: Build a per-case summary for the active cohort:
---          - If text quality is good, use cleaned complaint text
---          - Else, use image summary if available
--- Inputs:  batch_ids, cases_for_classify, cases_text_quality, batch_image_summaries
--- Outputs: batch_case_summaries (VIEW)
--- Idempotency: CREATE OR REPLACE VIEW (safe)
+-- 04_case_summaries.sql
+DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
+DECLARE dataset    STRING DEFAULT '${DATASET}';
 
--- ===========
--- PARAMETERS
--- ===========
-DECLARE project_id STRING DEFAULT "@PROJECT_ID";
-DECLARE dataset    STRING DEFAULT "@DATASET";
-
--- ============================
--- View: batch_case_summaries
--- ============================
 EXECUTE IMMEDIATE FORMAT("""
 CREATE OR REPLACE VIEW `%s.%s.batch_case_summaries` AS
 WITH ids AS (
@@ -46,8 +32,10 @@ SELECT
 FROM ids i
 JOIN text_src t USING (service_request_id)
 LEFT JOIN img_src i2 USING (service_request_id);
-""", project_id, dataset,
-     project_id, dataset,
-     project_id, dataset,
-     project_id, dataset,
-     project_id, dataset);
+""",
+project_id, dataset,    -- view name
+project_id, dataset,    -- batch_ids
+project_id, dataset,    -- cases_for_classify
+project_id, dataset,    -- cases_text_quality
+project_id, dataset     -- batch_image_summaries
+);
