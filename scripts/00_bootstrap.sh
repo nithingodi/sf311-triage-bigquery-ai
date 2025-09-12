@@ -75,10 +75,14 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${GEM_SA}" \
   --role="roles/aiplatform.user" >/dev/null || true
 
-# BigQuery ML service account (needed for ML.PREDICT)
+# BigQuery ML service account (if exists)
 BQ_SA="${PROJECT_ID}@bigquery-encryption.iam.gserviceaccount.com"
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${BQ_SA}" \
-  --role="roles/aiplatform.user" >/dev/null || true
+if gcloud iam service-accounts describe "$BQ_SA" >/dev/null 2>&1; then
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${BQ_SA}" \
+    --role="roles/aiplatform.user" >/dev/null || true
+else
+  echo "BigQuery ML service account does not exist, skipping..."
+fi
 
 echo "== Bootstrap complete =="
