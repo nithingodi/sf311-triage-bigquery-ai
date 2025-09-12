@@ -1,9 +1,6 @@
 -- 02_models.sql
--- Variables rendered via envsubst in Makefile
-DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
-DECLARE dataset    STRING DEFAULT '${DATASET}';
-DECLARE location   STRING DEFAULT '${LOCATION}';
-DECLARE conn_id    STRING DEFAULT '${CONN}';
+-- This script creates generative text and embeddings models
+-- Env vars are substituted via Makefile + envsubst
 
 -- Generative text model
 CREATE OR REPLACE MODEL `${PROJECT_ID}.${DATASET}.gemini_text`
