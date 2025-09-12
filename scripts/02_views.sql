@@ -3,17 +3,10 @@
 -- Purpose: Provide normalized SF311 cases and a cleaned text view ready for classification/summarization.
 -- Idempotency: CREATE OR REPLACE VIEW (safe to re-run).
 
--- ===========
--- PARAMETERS
--- ===========
-DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
-DECLARE dataset    STRING DEFAULT '${DATASET}';
-
 -- =====================
 -- Normalized case view
 -- =====================
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE VIEW `%s.%s.cases_norm` AS
+CREATE OR REPLACE VIEW `${PROJECT_ID}.${DATASET}.cases_norm` AS
 SELECT
   CAST(unique_key AS STRING)                         AS service_request_id,
   created_date                                       AS requested_datetime,
@@ -22,17 +15,15 @@ SELECT
   agency_name                                        AS agency_responsible,
   media_url
 FROM `bigquery-public-data.san_francisco_311.311_service_requests`;
-""", project_id, dataset);
 
 -- ===================================
 -- Cleaned text view for classification
 -- ===================================
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE VIEW `%s.%s.cases_for_classify` AS
+CREATE OR REPLACE VIEW `${PROJECT_ID}.${DATASET}.cases_for_classify` AS
 WITH raw AS (
   SELECT service_request_id, request_type,
          COALESCE(request_details, request_type) AS txt
-  FROM `%s.%s.cases_norm`
+  FROM `${PROJECT_ID}.${DATASET}.cases_norm`
   WHERE COALESCE(request_details, request_type) IS NOT NULL
 ),
 deboil AS (
@@ -61,4 +52,3 @@ SELECT
          END
   END AS complaint_text
 FROM norm;
-""", project_id, dataset, project_id, dataset);
