@@ -1,35 +1,16 @@
--- Project: City311 Multimodal Triage with BigQuery AI
--- Script: 02_models.sql
--- Purpose: Define BigQuery REMOTE models for Generative AI and Text Embeddings via an existing connection.
--- Inputs: Existing BigQuery connection (CLOUD_RESOURCE) that has Vertex AI access (roles/aiplatform.user).
--- Outputs: ${DATASET}.gemini_text (REMOTE), ${DATASET}.embed_text (REMOTE).
--- Idempotency: CREATE OR REPLACE MODEL (safe to re-run).
--- Parameters: PROJECT_ID, DATASET, LOCATION, GEM_CONN_ID, GEN_ENDPOINT, EMB_ENDPOINT
+-- 02_models.sql
+-- Variables rendered via envsubst in Makefile
+DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
+DECLARE dataset    STRING DEFAULT '${DATASET}';
+DECLARE location   STRING DEFAULT '${LOCATION}';
+DECLARE conn_id    STRING DEFAULT '${CONN}';
 
--- ===========
--- PARAMETERS
--- ===========
-DECLARE project_id   STRING DEFAULT "@PROJECT_ID";
-DECLARE dataset      STRING DEFAULT "@DATASET";
-DECLARE location     STRING DEFAULT "@LOCATION";
-DECLARE gem_conn_id  STRING DEFAULT "@GEM_CONN_ID";
-DECLARE gen_endpoint STRING DEFAULT "@GEN_ENDPOINT";
-DECLARE emb_endpoint STRING DEFAULT "@EMB_ENDPOINT";
+-- Generative text model
+CREATE OR REPLACE MODEL `${PROJECT_ID}.${DATASET}.gemini_text`
+  REMOTE WITH CONNECTION `projects/${PROJECT_ID}/locations/${LOCATION}/connections/${CONN}`
+  OPTIONS (endpoint = 'gemini-2.0-flash-001');
 
--- ================================
--- Generative REMOTE model (Gemini)
--- ================================
-EXECUTE IMMEDIATE FORMAT("""
-  CREATE OR REPLACE MODEL `%s.%s.gemini_text`
-  REMOTE WITH CONNECTION `projects/%s/locations/%s/connections/%s`
-  OPTIONS (endpoint = '%s')
-""", project_id, dataset, project_id, location, gem_conn_id, gen_endpoint);
-
--- ===================================
--- Text Embedding REMOTE model (005)
--- ===================================
-EXECUTE IMMEDIATE FORMAT("""
-  CREATE OR REPLACE MODEL `%s.%s.embed_text`
-  REMOTE WITH CONNECTION `projects/%s/locations/%s/connections/%s`
-  OPTIONS (endpoint = '%s')
-""", project_id, dataset, project_id, location, gem_conn_id, emb_endpoint);
+-- Embeddings model
+CREATE OR REPLACE MODEL `${PROJECT_ID}.${DATASET}.embed_text`
+  REMOTE WITH CONNECTION `projects/${PROJECT_ID}/locations/${LOCATION}/connections/${CONN}`
+  OPTIONS (endpoint = 'text-embedding-005');
