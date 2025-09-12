@@ -1,34 +1,25 @@
 # Makefile — use with scripts/preprocess.sh
 SHELL := /bin/bash
 
+# at top of Makefile (or replace full file with previous suggested Makefile)
 PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
 LOCATION   ?= US
 DATASET    ?= sf311
 BUCKET     ?= $(PROJECT_ID)-data
 CONN       ?= us_gemini_conn
 
-ifeq ($(strip $(PROJECT_ID)),)
-$(error PROJECT_ID is empty. Run: gcloud config set project YOUR_PROJECT_ID)
-endif
-
-# BigQuery runner + dry-run
 BQQ = bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query --nouse_legacy_sql --quiet
 DRY = bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query --nouse_legacy_sql --quiet --dry_run
-
-# Preprocessor: normalizes @PROJECT_ID and %s placeholders into ${...} placeholders
 PREPROCESS = scripts/preprocess.sh
 
-# Render + run SQL:
-# 1) preprocess (produces ${PROJECT_ID} placeholders)
-# 2) envsubst (expands placeholders to actual values)
-# 3) pipe into bq
 RUN_SQL = @echo "== Running scripts/$1"; \
-          PROJECT_ID=$(PROJECT_ID) DATASET=$(DATASET) LOCATION=$(LOCATION) CONN=$(CONN) \
-          $(PREPROCESS) scripts/$1 | envsubst | $(BQQ)
+  PROJECT_ID=$(PROJECT_ID) DATASET=$(DATASET) LOCATION=$(LOCATION) CONN=$(CONN) \
+  $(PREPROCESS) scripts/$1 | envsubst | $(BQQ)
 
 LINT_SQL = @echo "== Lint (dry-run) scripts/$1"; \
-           PROJECT_ID=$(PROJECT_ID) DATASET=$(DATASET) LOCATION=$(LOCATION) CONN=$(CONN) \
-           $(PREPROCESS) scripts/$1 | envsubst | $(DRY)
+  PROJECT_ID=$(PROJECT_ID) DATASET=$(DATASET) LOCATION=$(LOCATION) CONN=$(CONN) \
+  $(PREPROCESS) scripts/$1 | envsubst | $(DRY)
+
 
 .PHONY: run_all bootstrap sql lint verify refresh exports clean reset
 
