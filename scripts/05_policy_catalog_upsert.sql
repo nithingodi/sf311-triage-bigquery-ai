@@ -1,4 +1,4 @@
--- 05_policy_catalog_upsert.sql
+-- Variables rendered by envsubst via Makefile
 DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
 DECLARE dataset    STRING DEFAULT '${DATASET}';
 
@@ -9,15 +9,13 @@ CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.policy_catalog` (
   theme          STRING
 );
 
--- Keep your existing UNNEST rows; the key fix is eliminating any '%s'.
 MERGE `${PROJECT_ID}.${DATASET}.policy_catalog` T
 USING (
   SELECT * FROM UNNEST([
-    -- Example row; replace with your curated entries.
     STRUCT('Illegal Parking — Tow Zones' AS policy_title,
-           'https://example'           AS source_url,
-           'Tow if posted tow-away'    AS policy_snippet,
-           'Illegal Parking'           AS theme)
+           'https://example'            AS source_url,
+           'Tow if posted tow-away'     AS policy_snippet,
+           'Illegal Parking'            AS theme)
   ])
 ) S
 ON T.policy_title = S.policy_title
