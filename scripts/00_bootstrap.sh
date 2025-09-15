@@ -41,8 +41,9 @@ if ! bq show --connection --project_id=$PROJECT_ID --location=$LOCATION $BQ_CONN
         --project_id=$PROJECT_ID \
         --connection_type=CLOUD_RESOURCE \
         $BQ_CONNECTION_ID
-    echo "    Connection created. Waiting 10 seconds for it to initialize..."
-    sleep 10 # Add a brief wait after creating a new connection.
+    # --- Increased wait time ---
+    echo "    Connection created. Waiting 60 seconds for it to initialize and for IAM to propagate..."
+    sleep 60
 else
     echo "    Connection '$BQ_CONNECTION_ID' already exists."
 fi
@@ -50,7 +51,7 @@ fi
 # --- Step 5: Grant IAM Permissions to the Connection's Service Account ---
 echo "--> Granting 'Vertex AI User' role to the connection's service account..."
 
-# NEW: Retry loop to handle potential delays in service account creation.
+# Retry loop to handle potential delays in service account creation.
 RETRY_COUNT=0
 MAX_RETRIES=5
 DELAY=5
