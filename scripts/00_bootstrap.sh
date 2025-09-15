@@ -48,17 +48,17 @@ fi
 # --- Step 5: Grant IAM Permissions to the Connection's Service Account ---
 echo "--> Granting 'Vertex AI User' role to the connection's service account..."
 
-# First, get the service account ID from the connection details
-SERVICE_ACCOUNT_ID=$(bq show --connection --project_id=$PROJECT_ID --location=US $BQ_CONNECTION_ID | grep serviceAccountId | awk '{print $2}' | tr -d '"')
+# Get the service account ID using the reliable JSON output format and jq parser.
+SERVICE_ACCOUNT_ID=$(bq show --connection --project_id=$PROJECT_ID --location=US --format=json $BQ_CONNECTION_ID | jq -r .serviceAccountId)
 
-if [ -z "$SERVICE_ACCOUNT_ID" ]; then
+if [ -z "$SERVICE_ACCOUNT_ID" ] || [ "$SERVICE_ACCOUNT_ID" == "null" ]; then
     echo "    🚨 Could not find Service Account ID for connection. Exiting."
     exit 1
 fi
 
 echo "    Found Service Account: $SERVICE_ACCOUNT_ID"
 
-# Grant the required IAM role. The '--condition=None' flag prevents errors if the role is already granted.
+# Grant the required IAM role.
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SERVICE_ACCOUNT_ID" \
     --role="roles/aiplatform.user" \
