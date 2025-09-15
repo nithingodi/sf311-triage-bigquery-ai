@@ -1,19 +1,12 @@
 -- 02_models.sql
-DECLARE project_id STRING DEFAULT "${PROJECT_ID}";
-DECLARE dataset    STRING DEFAULT "${DATASET}";
-DECLARE location   STRING DEFAULT "${LOCATION}";
-DECLARE conn_id    STRING DEFAULT "${CONN}";
+-- This script creates the two remote models needed for the project:
+-- 1. A generative model based on Gemini Pro.
+-- 2. An embedding model to create vector representations of text.
 
--- Generative text model (must include dataset)
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE MODEL `%s.%s.gemini_text`
-REMOTE WITH CONNECTION `projects/%s/locations/%s/connections/%s`
-OPTIONS (endpoint = 'gemini-2.0-flash-001');
-""", project_id, dataset, project_id, location, conn_id);
+CREATE OR REPLACE MODEL `@@DATASET_ID@@.gemini_pro_model`
+  REMOTE WITH CONNECTION `@@PROJECT_ID@@.@@LOCATION@@.@@BQ_CONNECTION_ID@@`
+  OPTIONS (endpoint = 'gemini-pro');
 
--- Embeddings model
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE MODEL `%s.%s.embed_text`
-REMOTE WITH CONNECTION `projects/%s/locations/%s/connections/%s`
-OPTIONS (endpoint = 'text-embedding-005');
-""", project_id, dataset, project_id, location, conn_id);
+CREATE OR REPLACE MODEL `@@DATASET_ID@@.embedding_model`
+  REMOTE WITH CONNECTION `@@PROJECT_ID@@.@@LOCATION@@.@@BQ_CONNECTION_ID@@`
+  OPTIONS (endpoint = 'text-embedding-004');
