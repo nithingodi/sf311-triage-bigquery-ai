@@ -141,11 +141,23 @@ This project demonstrates how to build an intelligent triage agent for SF311 ser
 Due to potential environmental restrictions (like Google Cloud Organization Policies), a one-time manual setup script is required to provision the BigQuery connection correctly.
 
 ---
-## Step 1: Prerequisites (One-Time Setup)
+## Setup and Run
 
-Before running the project for the first time, you must grant your user account the necessary permissions.
+Follow these steps in order in your Google Cloud Shell to run the project.
 
-1.  **Log into Google Cloud Shell and set your project:**
+### Step 1: Clone the Repository
+
+First, clone this repository to your local environment and navigate into the project directory.
+```bash
+git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git](https://github.com/nithingodi/sf311-triage-bigquery-ai.git)
+cd sf311-triage-bigquery-ai
+```
+
+### Step 2: Set Project and User Permissions (One-Time Setup)
+
+Before running the project for the first time, you must configure your project and grant your user account the necessary permissions.
+
+1.  **Set your project ID:**
     ```bash
     gcloud config set project sf311-471122
     ```
@@ -159,20 +171,16 @@ Before running the project for the first time, you must grant your user account 
         --role="roles/iam.serviceAccountUser"
     ```
 
----
-## Step 2: Manual Connection Setup
+### Step 3: Run the Manual Connection Setup
 
-Next, run the manual setup script. This script will create the BigQuery connection, retrieve its unique service account ID, and automatically configure the main bootstrap script for you.
-
+Next, run the manual setup script. This script creates the BigQuery connection, retrieves its unique service account ID, and automatically configures the main bootstrap script for you.
 ```bash
 bash scripts/manual_setup.sh
 ```
 
----
-## Step 3: Run the Project
+### Step 4: Run the Project Pipeline
 
 After the manual setup is complete, you can run the entire project pipeline using the `make` command.
-
 ```bash
 make run_all
 ```
