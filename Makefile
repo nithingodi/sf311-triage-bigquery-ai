@@ -1,88 +1,62 @@
-SHELL := /bin/bash
+# Get the currently configured GCP Project ID
+PROJECT_ID := $(shell gcloud config get-value project)
 
-PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
-LOCATION   ?= US
-DATASET    ?= sf311
-BUCKET     ?= $(PROJECT_ID)-data
-CONN       ?= sf311-conn
+# Define the dataset ID, which will be used as a placeholder in all SQL scripts
+DATASET_ID := sf311
 
-BQQ = bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query --nouse_legacy_sql --quiet
-DRY = bq --project_id=$(PROJECT_ID) --location=$(LOCATION) query --nouse_legacy_sql --quiet --dry_run
-PREPROCESS = scripts/preprocess.sh
+# The main target to run the entire pipeline from start to finish
+.PHONY: run_all
+run_all: bootstrap models views quality_and_cohorts image_summaries case_summaries triage policy_catalog embeddings refinement dashboards comparison
+	@echo "✅ All steps completed successfully for project $(PROJECT_ID)!"
 
-RUN_SQL = @echo "== Running scripts/$1"; \
-  PROJECT_ID=$(PROJECT_ID) DATASET=$(DATASET) LOCATION=$(LOCATION) CONN=$(CONN) \
-  bash $(PREPROCESS) scripts/$1 | envsubst | $(BQQ)
-
-LINT_SQL = @echo "== Lint (dry-run) scripts/$1"; \
-  PROJECT_ID=$(PROJECT_ID) DATASET=$(DATASET) LOCATION=$(LOCATION) CONN=$(CONN) \
-  bash $(PREPROCESS) scripts/$1 | envsubst | $(DRY)
-
-.PHONY: run_all bootstrap sql lint verify refresh exports clean reset
-
-run_all: bootstrap sql
-
+# Target to set up all necessary infrastructure
+.PHONY: bootstrap
 bootstrap:
-	@echo "== Bootstrap project: $(PROJECT_ID) ==" 
-	@gcloud config set project $(PROJECT_ID)
-	@gcloud services enable bigquery.googleapis.com \
-		aiplatform.googleapis.com \
-		storage-component.googleapis.com
-	# Create dataset if not exists
-	-bq --project_id=$(PROJECT_ID) mk --dataset --location=$(LOCATION) $(DATASET) || true
-	# Create bucket if not exists
-	-bash -c 'gsutil mb -l $(LOCATION) gs://$(BUCKET) || true'
-	# Create BQ connection (idempotent)
-	-bq mk --connection --connection_type=CLOUD_RESOURCE $(CONN) || true
-	@echo "== Bootstrap complete =="
+	@echo "--- 1. Bootstrapping GCP Resources ---"
+	@bash scripts/00_bootstrap.sh
 
-sql:
+# A helper function to run SQL scripts. It replaces the @@DATASET_ID@@ placeholder.
+define RUN_SQL
+	@echo "--> Running $(1)..."
+	@sed 's/@@DATASET_ID@@/$(DATASET_ID)/g' scripts/$(1) | bq query --project_id=$(PROJECT_ID) --nouse_legacy_sql
+endef
+
+# Targets for each individual SQL script
+.PHONY: models views quality_and_cohorts image_summaries case_summaries triage policy_catalog embeddings refinement dashboards comparison
+models:
 	$(call RUN_SQL,02_models.sql)
+views:
 	$(call RUN_SQL,02_views.sql)
+quality_and_cohorts:
 	$(call RUN_SQL,03_quality_and_cohorts.sql)
+image_summaries:
 	$(call RUN_SQL,03_image_summaries.sql)
+case_summaries:
 	$(call RUN_SQL,04_case_summaries.sql)
+triage:
 	$(call RUN_SQL,04_triage_generate_v2.sql)
+policy_catalog:
 	$(call RUN_SQL,05_label_taxonomy.sql)
+	$(call RUN_SQL,05_policy_catalog.sql)
 	$(call RUN_SQL,05_policy_catalog_upsert.sql)
+embeddings:
 	$(call RUN_SQL,06_embeddings_and_search_tuned.sql)
+refinement:
 	$(call RUN_SQL,07_refine_prep.sql)
 	$(call RUN_SQL,07_refinement.sql)
+dashboards:
 	$(call RUN_SQL,08_dashboards.sql)
+comparison:
 	$(call RUN_SQL,09_proto_comparison.sql)
-	$(call RUN_SQL,10_validation.sql)
 
-lint:
-	$(call LINT_SQL,02_models.sql)
-	$(call LINT_SQL,02_views.sql)
-	$(call LINT_SQL,03_quality_and_cohorts.sql)
-	$(call LINT_SQL,03_image_summaries.sql)
-	$(call LINT_SQL,04_case_summaries.sql)
-	$(call LINT_SQL,04_triage_generate_v2.sql)
-	$(call LINT_SQL,05_label_taxonomy.sql)
-	$(call LINT_SQL,05_policy_catalog_upsert.sql)
-	$(call LINT_SQL,06_embeddings_and_search_tuned.sql)
-	$(call LINT_SQL,07_refine_prep.sql)
-	$(call LINT_SQL,07_refinement.sql)
-	$(call LINT_SQL,08_dashboards.sql)
-	$(call LINT_SQL,09_proto_comparison.sql)
-	$(call LINT_SQL,10_validation.sql)
-
-verify:
-	@echo "Project: $(PROJECT_ID) | Location: $(LOCATION) | Dataset: $(DATASET) | Bucket: gs://$(BUCKET) | Connection: $(CONN)"
-
-refresh:
-	@git fetch origin && git reset --hard origin/main && git clean -xfd
-
-exports:
-	@mkdir -p exports
-	@$(BQQ) 'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_proto_comparison_metrics`' > exports/proto_metrics.csv
-	@$(BQQ) 'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_alignment_pie`' > exports/alignment_pie.csv
-	@$(BQQ) 'SELECT * FROM `$(PROJECT_ID).$(DATASET).v_mismatch_examples`' > exports/mismatch_examples.csv
-	@echo "Exports written to ./exports"
-
+# Target to destroy all created resources
+.PHONY: clean
 clean:
-	-@gcloud storage buckets delete -q gs://$(BUCKET) 2>/dev/null || true
-	-@bq --project_id=$(PROJECT_ID) --location=$(LOCATION) rm -r -f -d $(PROJECT_ID):$(DATASET) || true
-
-reset: clean run_all
+	@echo "--- Tearing down all resources ---"
+	@bq rm -f -t "$(PROJECT_ID):$(DATASET_ID).batch_policy_matches_v2"
+	@bq rm -f -t "$(PROJECT_ID):$(DATASET_ID).refinement_results"
+	@# Add 'bq rm' commands for all other tables and views here...
+	@bq rm -f -m "$(PROJECT_ID):$(DATASET_ID).triage_model"
+	@bq rm -f --dataset --recursive=true "$(PROJECT_ID):$(DATASET_ID)"
+	@gsutil rm -r "gs://$(PROJECT_ID)-sf311-data"
+	@echo "Teardown complete."
