@@ -133,21 +133,48 @@ MIT
 
 ## To run
 
+
+# SF311 Triage with BigQuery AI
+
+This project demonstrates how to build an intelligent triage agent for SF311 service requests using BigQuery's built-in AI capabilities.
+
+Due to potential environmental restrictions (like Google Cloud Organization Policies), a one-time manual setup script is required to provision the BigQuery connection correctly.
+
+---
+## Step 1: Prerequisites (One-Time Setup)
+
+Before running the project for the first time, you must grant your user account the necessary permissions.
+
+1.  **Log into Google Cloud Shell and set your project:**
+    ```bash
+    gcloud config set project sf311-471122
+    ```
+
+2.  **Grant your account the "Service Account User" role:**
+    This command will automatically detect your user email and grant the required permission. It may take up to 90 seconds for this permission to become fully active.
+    ```bash
+    USER_EMAIL=$(gcloud config get-value account)
+    gcloud projects add-iam-policy-binding sf311-471122 \
+        --member="user:$USER_EMAIL" \
+        --role="roles/iam.serviceAccountUser"
+    ```
+
+---
+## Step 2: Manual Connection Setup
+
+Next, run the manual setup script. This script will create the BigQuery connection, retrieve its unique service account ID, and automatically configure the main bootstrap script for you.
+
 ```bash
-# ==== 0) Set your GCP project ====
-MY_PROJECT="<YOUR_GCP_PROJECT_ID>"
-gcloud config set project "$MY_PROJECT"
-
-# ==== 1) Clone the repo ====
-cd ~
-git clone https://github.com/nithingodi/sf311-triage-bigquery-ai.git
-cd sf311-triage-bigquery-ai
-
-# ==== 2) Bootstrap environment (creates dataset, bucket, connections, IAM) ====
-make run_all PROJECT_ID=$MY_PROJECT
-
-# ==== 3) (Optional) Export chart data to CSV ====
-make exports PROJECT_ID=$MY_PROJECT
-
+bash scripts/manual_setup.sh
 ```
+
+---
+## Step 3: Run the Project
+
+After the manual setup is complete, you can run the entire project pipeline using the `make` command.
+
+```bash
+make run_all
+```
+
 
