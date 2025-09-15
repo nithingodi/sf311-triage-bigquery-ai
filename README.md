@@ -149,7 +149,7 @@ Follow these steps in order in your Google Cloud Shell to run the project.
 
 First, clone this repository to your local environment and navigate into the project directory.
 ```bash
-git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git](https://github.com/nithingodi/sf311-triage-bigquery-ai.git)
+git clone https://github.com/nithingodi/sf311-triage-bigquery-ai.git
 cd sf311-triage-bigquery-ai
 ```
 
