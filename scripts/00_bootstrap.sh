@@ -1,36 +1,40 @@
 #!/bin/bash
-set -e
+set -e # Exit immediately if a command exits with a non-zero status.
 
 # --- Configuration ---
-# This script derives all names from the user's gcloud config.
 export PROJECT_ID=$(gcloud config get-value project)
 export DATASET_ID="sf311"
 export LOCATION="US"
-export GCS_BUCKET="${PROJECT_ID}-sf311-data" # Globally unique bucket name
+export GCS_BUCKET="${PROJECT_ID}-sf311-data"
 export BQ_CONNECTION_ID="sf311-conn"
 
-echo "--- Using Project:    $PROJECT_ID"
-echo "--- Using Dataset:    $DATASET_ID"
-echo "--- Using GCS Bucket:   gs://$GCS_BUCKET"
-echo "--- Using BQ Connection: $BQ_CONNECTION_ID"
+echo "--- 🛠️  Starting Bootstrap for Project: $PROJECT_ID ---"
 echo ""
 
-# --- Resource Creation ---
-echo "--> Creating BigQuery Dataset if it doesn't exist..."
+# --- Step 1: Enable Required Google Cloud APIs ---
+echo "--> Enabling required APIs (Vertex AI & BigQuery Connection)..."
+gcloud services enable aiplatform.googleapis.com \
+                       bigqueryconnection.googleapis.com \
+                       --project=$PROJECT_ID
+
+# --- Step 2: Create BigQuery Dataset ---
+echo "--> Creating BigQuery Dataset '$DATASET_ID' (if needed)..."
 bq mk --dataset \
     --location=$LOCATION \
     --project_id=$PROJECT_ID \
     --description="Dataset for SF311 Triage project" \
-    $DATASET_ID || echo "Dataset $DATASET_ID already exists."
+    $DATASET_ID || echo "    Dataset '$DATASET_ID' already exists."
 
-echo "--> Creating GCS Bucket if it doesn't exist..."
+# --- Step 3: Create GCS Bucket ---
+echo "--> Creating GCS Bucket 'gs://$GCS_BUCKET' (if needed)..."
 if ! gsutil ls -b "gs://$GCS_BUCKET" >/dev/null 2>&1; then
     gsutil mb -p $PROJECT_ID -l $LOCATION "gs://$GCS_BUCKET"
 else
-    echo "Bucket gs://$GCS_BUCKET already exists."
+    echo "    Bucket 'gs://$GCS_BUCKET' already exists."
 fi
 
-echo "--> Creating BigQuery Connection if it doesn't exist..."
+# --- Step 4: Create BigQuery Connection ---
+echo "--> Creating BigQuery Connection '$BQ_CONNECTION_ID' (if needed)..."
 if ! bq show --connection --project_id=$PROJECT_ID --location=$LOCATION $BQ_CONNECTION_ID >/dev/null 2>&1; then
     bq mk --connection \
         --location=$LOCATION \
@@ -38,7 +42,28 @@ if ! bq show --connection --project_id=$PROJECT_ID --location=$LOCATION $BQ_CONN
         --connection_type=CLOUD_RESOURCE \
         $BQ_CONNECTION_ID
 else
-    echo "Connection $BQ_CONNECTION_ID already exists."
+    echo "    Connection '$BQ_CONNECTION_ID' already exists."
 fi
 
-echo "--- Bootstrap complete ---"
+# --- Step 5: Grant IAM Permissions to the Connection's Service Account ---
+echo "--> Granting 'Vertex AI User' role to the connection's service account..."
+
+# First, get the service account ID from the connection details
+SERVICE_ACCOUNT_ID=$(bq show --connection --project_id=$PROJECT_ID --location=US $BQ_CONNECTION_ID | grep serviceAccountId | awk '{print $2}' | tr -d '"')
+
+if [ -z "$SERVICE_ACCOUNT_ID" ]; then
+    echo "    🚨 Could not find Service Account ID for connection. Exiting."
+    exit 1
+fi
+
+echo "    Found Service Account: $SERVICE_ACCOUNT_ID"
+
+# Grant the required IAM role. The '--condition=None' flag prevents errors if the role is already granted.
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SERVICE_ACCOUNT_ID" \
+    --role="roles/aiplatform.user" \
+    --condition=None > /dev/null # Hide verbose output
+
+echo "    Permissions granted successfully."
+echo ""
+echo "--- ✅ Bootstrap complete ---"
