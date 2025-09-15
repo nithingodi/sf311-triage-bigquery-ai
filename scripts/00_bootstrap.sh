@@ -19,11 +19,15 @@ gcloud services enable aiplatform.googleapis.com \
 
 # --- Step 2: Create BigQuery Dataset ---
 echo "--> Creating BigQuery Dataset '$DATASET_ID' (if needed)..."
-bq mk --dataset \
-    --location=$LOCATION \
-    --project_id=$PROJECT_ID \
-    --description="Dataset for SF311 Triage project" \
-    $DATASET_ID || echo "    Dataset '$DATASET_ID' already exists."
+if ! bq show --dataset "${PROJECT_ID}:${DATASET}" >/dev/null 2>&1; then
+    bq mk --dataset \
+        --location=$LOCATION \
+        --project_id=$PROJECT_ID \
+        --description="Dataset for SF311 Triage project" \
+        $DATASET_ID
+else
+    echo "    Dataset '$DATASET_ID' already exists."
+fi
 
 # --- Step 3: Create GCS Bucket ---
 echo "--> Creating GCS Bucket 'gs://$GCS_BUCKET' (if needed)..."
