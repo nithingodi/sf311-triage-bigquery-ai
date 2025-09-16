@@ -16,17 +16,17 @@ WITH refined AS (
   SELECT
     t.*,
     ML.GENERATE_TEXT(
-      MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
-      (
-        SELECT
-          CONCAT(
-            'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
-            '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
-            '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
-          ) AS prompt
-      ),
-      STRUCT(0.0 AS temperature)
-    ).ml_generate_text_result AS refined_action
+  MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
+  (
+    SELECT
+      CONCAT(
+        'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
+        '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
+        '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
+      ) AS prompt
+  ),
+  STRUCT(0.0 AS temperature)
+).ml_generate_text_result AS refined_action
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.triage_todo_v2` AS t
 )
 SELECT
