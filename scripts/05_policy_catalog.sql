@@ -33,11 +33,12 @@ SELECT
   chunk_text,
   source_url,
   target_theme,
-  (SELECT embedding FROM ML.GENERATE_EMBEDDING(
+  ml.generate_embedding(
     MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
-    (SELECT AS STRUCT chunk_text AS content)
-  )) AS embedding
+    TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
+  ) AS embedding
 FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`;
+
 -- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
 SELECT
