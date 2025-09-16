@@ -13,9 +13,9 @@ WITH text_source AS (
 image_source AS (
   SELECT
     service_request_id,
-    -- Correctly extract the text result from the JSON column
-    summary_result.ml_generate_text_result AS image_summary
-  FROM `@@PROJECT_ID@@.@@DATASET_ID@@.image_summaries`
+    -- Extract the text result from AI.GENERATE output
+    summary_text AS image_summary
+  FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_image_summaries`
 )
 SELECT
   t.service_request_id,
