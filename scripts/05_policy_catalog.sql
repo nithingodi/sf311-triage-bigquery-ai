@@ -38,7 +38,6 @@ SELECT
     (SELECT AS STRUCT chunk_text AS content)
   )) AS embedding
 FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`;
-
 -- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
 SELECT
