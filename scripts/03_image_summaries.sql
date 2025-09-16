@@ -5,6 +5,7 @@ SELECT
   s.service_request_id,
   ML.GENERATE_TEXT(
     MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
+    -- input struct for the model
     (SELECT AS STRUCT
       CONCAT(
         'Summarize this SF311 complaint photo in one concise sentence (<= 30 words). The complaint is about: ',
@@ -13,7 +14,8 @@ SELECT
       ) AS prompt,
       [s.media_url] AS uris
     ),
-    JSON '{"temperature": 0.1, "max_output_tokens": 256}'
+    -- options as a struct (explicit & safer than raw JSON)
+    (SELECT AS STRUCT 0.1 AS temperature, 256 AS max_output_tokens)
   ) AS summary_result
 FROM `@@PROJECT_ID@@.@@DATASET_ID@@.cases_text_quality` AS s
 WHERE s.has_media AND s.is_bad_text;
