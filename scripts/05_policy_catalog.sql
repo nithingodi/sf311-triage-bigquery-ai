@@ -25,25 +25,29 @@ VALUES
   ('pw_waste_needle_002','Needles/Medical Waste - How to Report', 'Improperly disposed needles or medical waste should be reported through 311; do not handle needles yourself.', 'https://sfpublicworks.org/services/report-problem','Human/Animal Waste');
 
 
--- Creates the policy_catalog table with a single batch-run of ML.GENERATE_EMBEDDING.
+-- Creates the policy_catalog table by joining the chunks with their embeddings.
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_catalog` AS
 SELECT
-  pc.* EXCEPT(chunk_text), -- Exclude the old column name
-  emb.content AS content, -- Add the content column from the embeddings output
-  emb.embedding AS embedding
+  pc.* EXCEPT(chunk_text),
+  emb.content,
+  emb.embedding
 FROM
   `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks` AS pc
-LEFT JOIN
-  (
-    SELECT
-      content,
-      embedding
-    FROM
-      ML.GENERATE_EMBEDDING(
-        MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
-        TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
-      )
-  ) AS emb ON emb.content = pc.chunk_text;
+LEFT JOIN (
+  SELECT
+    policy_id,
+    content,
+    embedding
+  FROM ML.GENERATE_EMBEDDING(
+    MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
+    TABLE (
+      SELECT
+        policy_id,
+        chunk_text AS content
+      FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
+    )
+  )
+) AS emb ON emb.policy_id = pc.policy_id;
 
 -- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
