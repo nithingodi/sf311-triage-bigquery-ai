@@ -3,15 +3,16 @@ CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2` AS
 SELECT
   s.service_request_id,
   s.summary,
-  ML.GENERATE_TEXT(
-    MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
-    (SELECT AS STRUCT
+  AI.GENERATE(
+    (
       CONCAT(
         'EXTRACT a theme, severity, and action from this SF311 complaint. SEVERITY must be one of: [Low, Medium, High, Critical]. ACTION must be one of: [Dispatch, Maintenance, Information, Policy].',
         ' COMPLAINT: ', s.summary
       ) AS prompt
     ),
-    JSON '{"temperature": 0.0, "max_output_tokens": 100}'
-  ) AS triage_result
+    connection_id => 'projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-gemini-conn',
+    endpoint => 'gemini-2.0-flash-001',
+    model_params => JSON '{"temperature": 0.0, "max_output_tokens": 100}'
+  ).result AS triage_result
 FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_case_summaries` AS s
 WHERE s.summary IS NOT NULL;
