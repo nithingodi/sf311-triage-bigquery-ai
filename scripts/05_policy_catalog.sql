@@ -24,6 +24,21 @@ VALUES
   ('pw_waste_001','Human/Animal Waste - Public Right of Way', 'Public Works responds to reports of human or animal waste in the public right of way submitted via 311. Provide exact location and nearest cross street.', 'https://sfpublicworks.org/services/garbage-and-waste','Human/Animal Waste'),
   ('pw_waste_needle_002','Needles/Medical Waste - How to Report', 'Improperly disposed needles or medical waste should be reported through 311; do not handle needles yourself.', 'https://sfpublicworks.org/services/report-problem','Human/Animal Waste');
 
+
+-- Creates the policy_catalog table with a single batch-run of ML.GENERATE_EMBEDDING.
+CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_catalog` AS
+SELECT
+  policy_id,
+  title,
+  chunk_text,
+  source_url,
+  target_theme,
+  ML.GENERATE_EMBEDDING(
+    MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
+    (SELECT AS STRUCT chunk_text AS content)
+  ).embedding AS embedding
+FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`;
+
 -- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
 SELECT
