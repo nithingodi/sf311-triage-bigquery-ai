@@ -13,7 +13,7 @@ SELECT
     ),
     connection_id => 'projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-conn',
     endpoint => 'gemini-2.0-flash-001',
-    model_params => JSON '{"temperature": 0.0, "max_output_tokens": 100}'
+    model_params => JSON '{"generation_config":{"temperature": 0.0, "max_output_tokens": 100}}'
   ).result AS triage_result
 FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_case_summaries` AS s
 WHERE s.summary IS NOT NULL;
