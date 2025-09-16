@@ -1,4 +1,6 @@
--- Seeds a lightweight policy/pattern catalog.
+-- Full fixed script: seeds policy_chunks, generates embeddings robustly, builds policy_catalog, and creates validation view.
+
+-- 1) Seed the policy_chunks table
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks` (
   policy_id STRING,
   title STRING,
@@ -24,8 +26,7 @@ VALUES
   ('pw_waste_001','Human/Animal Waste - Public Right of Way', 'Public Works responds to reports of human or animal waste in the public right of way submitted via 311. Provide exact location and nearest cross street.', 'https://sfpublicworks.org/services/garbage-and-waste','Human/Animal Waste'),
   ('pw_waste_needle_002','Needles/Medical Waste - How to Report', 'Improperly disposed needles or medical waste should be reported through 311; do not handle needles yourself.', 'https://sfpublicworks.org/services/report-problem','Human/Animal Waste');
 
-
--- Creates the policy_catalog table by joining the chunks with their embeddings.
+-- 2) Build policy_catalog using ML.GENERATE_EMBEDDING correctly (pass policy_id through, normalize content)
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_catalog` AS
 SELECT
   pc.* EXCEPT(chunk_text),
@@ -43,13 +44,15 @@ LEFT JOIN (
     TABLE (
       SELECT
         policy_id,
-        chunk_text AS content
-      FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
+        TRIM(LOWER(chunk_text)) AS content
+      FROM
+        `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
     )
   )
-) AS emb ON emb.policy_id = pc.policy_id;
+) AS emb
+ON emb.policy_id = pc.policy_id;
 
--- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
+-- 3) Create validation view to check themes exist in label_taxonomy
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
 SELECT
   pc.policy_id,
