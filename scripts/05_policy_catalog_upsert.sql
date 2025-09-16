@@ -1,29 +1,25 @@
--- 05_policy_catalog_upsert.sql
-DECLARE project_id STRING DEFAULT '${PROJECT_ID}';
-DECLARE dataset    STRING DEFAULT '${DATASET}';
+-- This script demonstrates an upsert (update or insert) operation using a MERGE statement.
+-- It adds a new policy or updates the embedding for an existing one.
 
-CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.policy_catalog` (
-  policy_title   STRING,
-  source_url     STRING,
-  policy_snippet STRING,
-  theme          STRING
-);
-
-MERGE `${PROJECT_ID}.${DATASET}.policy_catalog` T
+MERGE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_catalog` T
 USING (
-  SELECT * FROM UNNEST([
-    -- Seed examples — keep or replace with your curated rows
-    STRUCT('Illegal Parking — Tow Zones' AS policy_title,
-           'https://example'            AS source_url,
-           'Tow if posted tow-away'     AS policy_snippet,
-           'Illegal Parking'            AS theme)
-  ])
+  SELECT
+    "1" AS policy_id,
+    "SFMTA" AS agency,
+    "Muni" AS category,
+    "General inquiries and feedback about Muni service." AS policy_summary,
+    ML.GENERATE_EMBEDDING(
+      MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
+      (SELECT "General inquiries and feedback about Muni service." AS content)
+    ).ml_generate_embedding_result AS embedding
 ) S
-ON T.policy_title = S.policy_title
-WHEN MATCHED THEN UPDATE SET
-  source_url     = S.source_url,
-  policy_snippet = S.policy_snippet,
-  theme          = S.theme
+ON T.policy_id = S.policy_id
+WHEN MATCHED THEN
+  UPDATE SET
+    T.agency = S.agency,
+    T.category = S.category,
+    T.policy_summary = S.policy_summary,
+    T.embedding = S.embedding
 WHEN NOT MATCHED THEN
-  INSERT (policy_title, source_url, policy_snippet, theme)
-  VALUES (S.policy_title, S.source_url, S.policy_snippet, S.theme);
+  INSERT (policy_id, agency, category, policy_summary, embedding)
+  VALUES (S.policy_id, S.agency, S.category, S.policy_summary, S.embedding);
