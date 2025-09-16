@@ -1,11 +1,7 @@
--- 02_models.sql
--- This script creates the two remote models needed for the project,
--- using the specific endpoints confirmed to work in this project.
+CREATE OR REPLACE MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`
+REMOTE WITH CONNECTION `projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-conn`
+OPTIONS (endpoint = 'gemini-1.5-flash');
 
-CREATE OR REPLACE MODEL `@@DATASET_ID@@.gemini_text`
-  REMOTE WITH CONNECTION `@@PROJECT_ID@@.@@LOCATION@@.@@BQ_CONNECTION_ID@@`
-  OPTIONS (endpoint = 'gemini-2.0-flash-001');
-
-CREATE OR REPLACE MODEL `@@DATASET_ID@@.embed_text`
-  REMOTE WITH CONNECTION `@@PROJECT_ID@@.@@LOCATION@@.@@BQ_CONNECTION_ID@@`
-  OPTIONS (endpoint = 'text-embedding-005');
+CREATE OR REPLACE MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`
+REMOTE WITH CONNECTION `projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-conn`
+OPTIONS (endpoint = 'text-embedding-004');
