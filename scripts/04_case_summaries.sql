@@ -13,7 +13,8 @@ WITH text_source AS (
 image_source AS (
   SELECT
     service_request_id,
-    ml_generate_text_result AS image_summary
+    -- Correctly extract the text result from the JSON column
+    summary_result.ml_generate_text_result AS image_summary
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.image_summaries`
 )
 SELECT
