@@ -16,15 +16,15 @@ WITH refined AS (
   SELECT
     t.*,
     ML.GENERATE_TEXT(
-      MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
-      TABLE (
-        SELECT CONCAT(
+      MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,  -- Keep your template
+      STRUCT(  -- ✅ Change TABLE to STRUCT
+        CONCAT(
           'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
           '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
           '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
         ) AS prompt
       ),
-      JSON '{"temperature": 0.0}'
+      STRUCT(0.0 AS temperature)  -- ✅ Change JSON to STRUCT
     ).ml_generate_text_result AS refined_action
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.triage_todo_v2` AS t
 )
@@ -39,7 +39,6 @@ SELECT
   policy_snippet,
   source_url,
   refined_action,
-  -- Simple alignment check based on keywords
   IF(
     REGEXP_CONTAINS(
       LOWER(refined_action),
