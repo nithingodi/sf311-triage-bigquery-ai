@@ -23,7 +23,8 @@ WITH refined AS (
             '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
             '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
           ) AS prompt
-      ),
+      )
+      , -- <-- A comma is needed here
       JSON '{"temperature": 0.0}'
     ) AS llm_result
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.triage_todo_v2` AS t
