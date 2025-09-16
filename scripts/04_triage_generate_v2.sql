@@ -5,10 +5,11 @@ SELECT
   s.summary,
   AI.GENERATE(
     (
-      CONCAT(
-        'EXTRACT a theme, severity, and action from this SF311 complaint. SEVERITY must be one of: [Low, Medium, High, Critical]. ACTION must be one of: [Dispatch, Maintenance, Information, Policy].',
-        ' COMPLAINT: ', s.summary
-      ) AS prompt
+      SELECT AS STRUCT
+        CONCAT(
+          'EXTRACT a theme, severity, and action from this SF311 complaint. SEVERITY must be one of: [Low, Medium, High, Critical]. ACTION must be one of: [Dispatch, Maintenance, Information, Policy].',
+          ' COMPLAINT: ', s.summary
+        ) AS prompt
     ),
     connection_id => 'projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-gemini-conn',
     endpoint => 'gemini-2.0-flash-001',
