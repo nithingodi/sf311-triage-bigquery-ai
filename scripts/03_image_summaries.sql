@@ -1,22 +1,32 @@
--- Creates or replaces a table of image summaries using the Gemini model
--- for cases that have media but poor quality text.
-CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.image_summaries` AS
+CREATE TABLE IF NOT EXISTS `@@PROJECT_ID@@.@@DATASET_ID@@.batch_image_summaries`
+(service_request_id STRING, summary_text STRING);
+
+INSERT INTO `@@PROJECT_ID@@.@@DATASET_ID@@.batch_image_summaries` (service_request_id, summary_text)
+WITH fallback_ext AS (
+  SELECT
+    CAST(n.service_request_id AS STRING) AS service_request_id,
+    n.media_url AS url
+  FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_fallback_ids` b
+  JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.cases_norm` n USING (service_request_id)
+  WHERE n.media_url IS NOT NULL AND TRIM(n.media_url) <> ""
+    AND REGEXP_CONTAINS(LOWER(n.media_url), r"\.(jpg|jpeg|png|gif)(?:$|[?#])")
+),
+todo AS (
+  SELECT f.service_request_id, f.url
+  FROM fallback_ext f
+  LEFT JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.batch_image_summaries` s USING (service_request_id)
+  WHERE s.service_request_id IS NULL
+  LIMIT 200
+)
 SELECT
-  s.service_request_id,
-ML.GENERATE_TEXT(
-  MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
-  input => (
-    SELECT AS STRUCT
-      CONCAT(
-        'Summarize this SF311 complaint photo in one concise sentence (<= 30 words). The complaint is about: ',
-        s.request_type,
-        '. Return only the sentence.'
-      ) AS prompt,
-      [s.media_url] AS uris
-  ),
-  options => (
-    SELECT AS STRUCT 0.1 AS temperature, 256 AS max_output_tokens
-  )
-) AS summary_result
-FROM `@@PROJECT_ID@@.@@DATASET_ID@@.cases_text_quality` AS s
-WHERE s.has_media AND s.is_bad_text;
+  service_request_id,
+  AI.GENERATE(
+    (
+      'Summarize this SF311 complaint photo in one concise sentence (<= 30 words). Return only the sentence.',
+      url
+    ),
+    connection_id => 'projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-conn',
+    endpoint => 'gemini-1.5-flash',
+    model_params => JSON '{"generation_config":{"temperature":0}}'
+  ).result AS summary_text
+FROM todo;
