@@ -138,49 +138,66 @@ MIT
 
 This project demonstrates how to build an intelligent triage agent for SF311 service requests using BigQuery's built-in AI capabilities.
 
-Due to potential environmental restrictions (like Google Cloud Organization Policies), a one-time manual setup script is required to provision the BigQuery connection correctly.
-
 ---
-## Setup and Run
+## Setup and Run Instructions
 
-Follow these steps in order in your Google Cloud Shell to run the project.
+Follow these steps in order in a Google Cloud Shell environment. This process involves a manual step to copy and paste a service account ID from the Google Cloud Console.
 
-### Step 1: Clone the Repository
+### Step 1: Clone Repository and Set Project
 
-First, clone this repository to your local environment and navigate into the project directory.
+First, clone the repository and configure your active Google Cloud project.
 ```bash
-git clone https://github.com/nithingodi/sf311-triage-bigquery-ai.git
+git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git](https://github.com/nithingodi/sf311-triage-bigquery-ai.git)
 cd sf311-triage-bigquery-ai
+gcloud config set project final-triage-project
 ```
 
-### Step 2: Set Project and User Permissions (One-Time Setup)
+### Step 2: Grant Your User Permissions (One-Time Setup)
 
-Before running the project for the first time, you must configure your project and grant your user account the necessary permissions.
-
-1.  **Set your project ID:**
-    ```bash
-    gcloud config set project sf311-471122
-    ```
-
-2.  **Grant your account the "Service Account User" role:**
-    This command will automatically detect your user email and grant the required permission. It may take up to 90 seconds for this permission to become fully active.
-    ```bash
-    USER_EMAIL=$(gcloud config get-value account)
-    gcloud projects add-iam-policy-binding sf311-471122 \
-        --member="user:$USER_EMAIL" \
-        --role="roles/iam.serviceAccountUser"
-    ```
-
-### Step 3: Run the Manual Connection Setup
-
-Next, run the manual setup script. This script creates the BigQuery connection, retrieves its unique service account ID, and automatically configures the main bootstrap script for you.
+This is a one-time setup for your user account in this project. It grants the permissions needed to create and manage BigQuery connections.
 ```bash
-bash scripts/manual_setup.sh
+USER_EMAIL=$(gcloud config get-value account)
+gcloud projects add-iam-policy-binding final-triage-project \
+    --member="user:$USER_EMAIL" \
+    --role="roles/iam.serviceAccountUser"
+echo "Waiting 60 seconds for permissions to become active..."
+sleep 60
 ```
 
-### Step 4: Run the Project Pipeline
+### Step 3: Create BigQuery Resources
 
-After the manual setup is complete, you can run the entire project pipeline using the `make` command.
+Run the following commands to create the necessary BigQuery dataset and connection.
+```bash
+# Create the dataset
+bq mk --dataset --location=US final-triage-project:sf311
+
+# Create the connection
+bq mk --connection --location=US --project_id=final-triage-project --connection_type=CLOUD_RESOURCE sf311-conn
+```
+
+### Step 4: Find and Copy the Service Account ID (Manual UI Step)
+
+Now, you will navigate to the Google Cloud Console to find the service account that was just created.
+
+1.  **Open this link in a new tab:** [BigQuery Connections](https://console.cloud.google.com/bigquery/connections)
+2.  Make sure you have the correct project (`final-triage-project`) selected at the top of the page.
+3.  Click on the connection named **`us.sf311-conn`**.
+4.  On the "Connection info" screen, find the **Service account ID** field and click the **Copy** icon next to it. It will look like `bqcx-...@gcp-sa-bigquery-condel.iam.gserviceaccount.com`.
+
+
+
+### Step 5: Grant Permissions to the Service Account (Manual Paste Step)
+
+Come back to your Cloud Shell terminal. **Paste the service account ID** you just copied into the command below, replacing `<PASTE_YOUR_SERVICE_ACCOUNT_ID_HERE>`.
+```bash
+gcloud projects add-iam-policy-binding final-triage-project \
+    --member="serviceAccount:<PASTE_YOUR_SERVICE_ACCOUNT_ID_HERE>" \
+    --role="roles/aiplatform.user"
+```
+
+### Step 6: Run the Project
+
+Now that the manual setup is complete, run the project's data processing and model creation steps using the `make` command.
 ```bash
 make run_all
 ```
