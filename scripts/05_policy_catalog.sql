@@ -40,14 +40,15 @@ LEFT JOIN (
   FROM ML.GENERATE_EMBEDDING(
     MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
     TABLE (
-      SELECT
-        policy_id,
-        chunk_text AS content
-      FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
+      (SELECT
+         policy_id,
+         chunk_text AS content
+       FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`)
     )
   )
 ) AS emb
 ON emb.policy_id = pc.policy_id;
+
 
 -- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
