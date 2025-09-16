@@ -39,8 +39,10 @@ case_summaries:
 triage:
 	$(call RUN_SQL,04_triage_generate_v2.sql)
 policy_catalog:
-	$(call RUN_SQL,05_label_taxonomy.sql)
+	$(call RUN_SQL,05_policy_chunks_for_embedding.sql)
+	$(call RUN_SQL,05_policy_embeddings.sql)
 	$(call RUN_SQL,05_policy_catalog.sql)
+	$(call RUN_SQL,05_policy_chunks_validation.sql)
 embeddings:
 	$(call RUN_SQL,06_embeddings_and_search_tuned.sql)
 refinement:
