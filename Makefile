@@ -41,7 +41,6 @@ triage:
 policy_catalog:
 	$(call RUN_SQL,05_label_taxonomy.sql)
 	$(call RUN_SQL,05_policy_catalog.sql)
-	$(call RUN_SQL,05_policy_catalog_upsert.sql)
 embeddings:
 	$(call RUN_SQL,06_embeddings_and_search_tuned.sql)
 refinement:
