@@ -28,15 +28,18 @@ VALUES
 -- Creates the policy_catalog table by joining the chunks with their embeddings.
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_catalog` AS
 SELECT
-  pc.*,
+  pc.* EXCEPT(chunk_text), -- Exclude the old column name
+  emb.content AS content, -- Add the content column from the embeddings output
   emb.embedding AS embedding
 FROM
-  `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks` AS pc,
+  `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks` AS pc
+CROSS JOIN
   ML.GENERATE_EMBEDDING(
     MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
     TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
   ) AS emb
 WHERE emb.content = pc.chunk_text;
+
 
 -- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
