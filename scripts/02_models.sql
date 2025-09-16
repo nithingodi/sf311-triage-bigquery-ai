@@ -1,12 +1,11 @@
 -- 02_models.sql
--- This script creates the two remote models needed for the project:
--- 1. A generative model based on Gemini Pro.
--- 2. An embedding model to create vector representations of text.
+-- This script creates the two remote models needed for the project,
+-- using the specific endpoints confirmed to work in this project.
 
-CREATE OR REPLACE MODEL `@@DATASET_ID@@.gemini_pro_model`
+CREATE OR REPLACE MODEL `@@DATASET_ID@@.gemini_text`
   REMOTE WITH CONNECTION `@@PROJECT_ID@@.@@LOCATION@@.@@BQ_CONNECTION_ID@@`
-  OPTIONS (endpoint = 'gemini-pro');
+  OPTIONS (endpoint = 'gemini-2.0-flash-001');
 
-CREATE OR REPLACE MODEL `@@DATASET_ID@@.embedding_model`
+CREATE OR REPLACE MODEL `@@DATASET_ID@@.embed_text`
   REMOTE WITH CONNECTION `@@PROJECT_ID@@.@@LOCATION@@.@@BQ_CONNECTION_ID@@`
-  OPTIONS (endpoint = 'text-embedding-004');
+  OPTIONS (endpoint = 'text-embedding-005');
