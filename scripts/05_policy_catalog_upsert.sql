@@ -1,6 +1,5 @@
 -- This script demonstrates an upsert (update or insert) operation using a MERGE statement.
 -- It adds a new policy or updates the embedding for an existing one.
-
 MERGE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_catalog` T
 USING (
   SELECT
@@ -11,7 +10,7 @@ USING (
     ML.GENERATE_EMBEDDING(
       MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
       (SELECT "General inquiries and feedback about Muni service." AS content)
-    ).ml_generate_embedding_result AS embedding
+    ).embedding AS embedding
 ) S
 ON T.policy_id = S.policy_id
 WHEN MATCHED THEN
