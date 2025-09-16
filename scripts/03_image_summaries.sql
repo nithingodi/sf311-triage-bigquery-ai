@@ -26,7 +26,7 @@ SELECT
       url
     ),
     connection_id => 'projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-conn',
-    endpoint => 'gemini-1.5-flash',
+    endpoint => 'gemini-2.0-flash-001',
     model_params => JSON '{"generation_config":{"temperature":0}}'
   ).result AS summary_text
 FROM todo;
