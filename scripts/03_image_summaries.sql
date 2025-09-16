@@ -4,7 +4,7 @@ CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.image_summaries` AS
 SELECT
   s.service_request_id,
   ML.GENERATE_TEXT(
-    MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
+    MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`
     -- input struct for the model
     (SELECT AS STRUCT
       CONCAT(
