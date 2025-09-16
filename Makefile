@@ -10,12 +10,12 @@ BQ_CONNECTION_ID := sf311-conn
 
 # --- Main Targets ---
 .PHONY: run_all
-run_all: bootstrap models views # Add other SQL targets here as you test them
-	@echo "\n✅ All steps completed successfully for project $(PROJECT_ID)!"
+run_all: bootstrap models views # Add other SQL targets here as needed
+	@echo "\n✅ All steps completed successfully!"
 
 .PHONY: bootstrap
 bootstrap:
-	@echo "--- 1. Bootstrapping GCP Resources ---"
+	@echo "--- 1. Bootstrapping all GCP Resources ---"
 	@bash scripts/00_bootstrap.sh
 
 # --- SQL Execution Helper ---
@@ -34,7 +34,6 @@ models:
 	$(call RUN_SQL,02_models.sql)
 views:
 	$(call RUN_SQL,02_views.sql)
-# Add targets for 03_quality_and_cohorts.sql, etc. here
 
 # --- Cleanup Target ---
 .PHONY: clean
