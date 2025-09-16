@@ -11,7 +11,7 @@ SELECT
           ' COMPLAINT: ', s.summary
         ) AS prompt
     ),
-    connection_id => 'projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-gemini-conn',
+    connection_id => 'projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-conn',
     endpoint => 'gemini-2.0-flash-001',
     model_params => JSON '{"temperature": 0.0, "max_output_tokens": 100}'
   ).result AS triage_result
