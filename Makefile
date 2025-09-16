@@ -1,22 +1,16 @@
 # Makefile
 
-# Automatically get the currently configured GCP Project ID
+# --- Configuration ---
 PROJECT_ID := $(shell gcloud config get-value project)
-
-# --- Centralized Configuration ---
 DATASET_ID := sf311
 LOCATION := US
 BQ_CONNECTION_ID := sf311-conn
 
-# --- Main Targets ---
+# --- Main Target ---
+# This now only runs the SQL scripts, assuming setup is done manually.
 .PHONY: run_all
-run_all: bootstrap models views # Add other SQL targets here as needed
-	@echo "\n✅ All steps completed successfully!"
-
-.PHONY: bootstrap
-bootstrap:
-	@echo "--- 1. Bootstrapping all GCP Resources ---"
-	@bash scripts/00_bootstrap.sh
+run_all: models views # Add other SQL targets here as needed
+	@echo "\n✅ All project scripts completed successfully!"
 
 # --- SQL Execution Helper ---
 define RUN_SQL
