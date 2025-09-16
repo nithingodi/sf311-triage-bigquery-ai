@@ -65,27 +65,70 @@ sf311-triage-bigquery-ai/
 ├── survey.txt
 └── README.md
 
-
 ---
 
 ## 🔧 Repro Steps
 
-> **Run order (BigQuery SQL Editor or CLI):**
+> **Run order (via Makefile in Google Cloud Shell):**
 
-1.  `bash scripts/00_bootstrap.sh`
-2.  `02_models.sql`
-3.  `02_views.sql`
-4.  `03_quality_and_cohorts.sql`
-5.  `03_image_summaries.sql`
-6.  `04_case_summaries.sql`
-7.  `04_triage_generate_v2.sql`
-8.  `05_label_taxonomy.sql`
-9.  `05_policy_catalog.sql` and `05_policy_catalog_upsert.sql`
-10. `06_embeddings_and_search_tuned.sql`
-11. `07_refine_prep.sql`
-12. `07_refinement.sql`
-13. `08_dashboards.sql`
-14. `09_proto_comparison.sql`
+1.  Clone the repository and set up the project:
+    ```bash
+    git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git](https://github.com/nithingodi/sf311-triage-bigquery-ai.git)
+    cd sf311-triage-bigquery-ai
+    gcloud config set project final-triage-project
+    ```
+
+2.  Grant user permissions (one-time setup):
+    ```bash
+    USER_EMAIL=$(gcloud config get-value account)
+    gcloud projects add-iam-policy-binding final-triage-project \
+        --member="user:$USER_EMAIL" \
+        --role="roles/iam.serviceAccountUser"
+    sleep 60
+    ```
+
+3.  Create BigQuery dataset and connections:
+    ```bash
+    # Create dataset
+    bq mk --dataset --location=US final-triage-project:sf311
+
+    # Create Gemini connection for Vertex AI
+    bq mk --connection --location=US --project_id=final-triage-project \
+        --connection_type=CLOUD_RESOURCE sf311-gemini-conn
+    GEM_SA=$(bq show --connection --format=json final-triage-project.US.sf311-gemini-conn | jq -r '.cloudResource.serviceAccountId')
+    gcloud projects add-iam-policy-binding final-triage-project \
+        --member="serviceAccount:${GEM_SA}" \
+        --role="roles/aiplatform.user"
+    sleep 60
+
+    # Create GCS connection for object table
+    bq mk --connection --location=US --project_id=final-triage-project \
+        --connection_type=CLOUD_RESOURCE sf311-gcs-conn
+    GCS_SA=$(bq show --connection --format=json final-triage-project.US.sf311-gcs-conn | jq -r '.cloudResource.serviceAccountId')
+    gcloud storage buckets create gs://final-triage-project-sf311-data --location=US --uniform-bucket-level-access
+    gcloud storage cp -n /dev/null gs://final-triage-project-sf311-data/sf311_cohort/images/.keep
+    gcloud storage buckets add-iam-policy-binding gs://final-triage-project-sf311-data \
+        --member="serviceAccount:${GCS_SA}" \
+        --role="roles/storage.objectViewer"
+    sleep 60
+    ```
+
+4.  Create object table for images:
+    ```bash
+    bq query --nouse_legacy_sql "
+    CREATE OR REPLACE EXTERNAL TABLE `final-triage-project.sf311.images_obj_cohort`
+    WITH CONNECTION `projects/final-triage-project/locations/US/connections/sf311-gcs-conn`
+    OPTIONS (
+      object_metadata = 'SIMPLE',
+      uris = ['gs://final-triage-project-sf311-data/sf311_cohort/images/*']
+    );"
+    ```
+
+5.  Run the full pipeline:
+    ```bash
+    make run_all
+    ```
+    - Note: Ensure `02_models.sql` and `03_image_summaries.sql` use `gemini-2.0-flash-001` as the endpoint (update scripts if needed).
 
 ---
 
@@ -97,17 +140,17 @@ sf311-triage-bigquery-ai/
 -   **Mismatch table** (before → after) → query `v_mismatch_examples`
 
 To export as CSV:
-
 ```bash
 bq query --nouse_legacy_sql \
-  'SELECT * FROM `sf311-triage-2025.sf311.v_proto_comparison_metrics`' > exports/proto_metrics.csv
+  'SELECT * FROM `final-triage-project.sf311.v_proto_comparison_metrics`' > exports/proto_metrics.csv
 
 bq query --nouse_legacy_sql \
-  'SELECT * FROM `sf311-triage-2025.sf311.v_alignment_pie`' > exports/alignment_pie.csv
+  'SELECT * FROM `final-triage-project.sf311.v_alignment_pie`' > exports/alignment_pie.csv
 
 bq query --nouse_legacy_sql \
-  'SELECT * FROM `sf311-triage-2025.sf311.v_mismatch_examples`' > exports/mismatch_examples.csv
+  'SELECT * FROM `final-triage-project.sf311.v_mismatch_examples`' > exports/mismatch_examples.csv
 ```
+
 ## 📋 Submission Checklist
 [x] Writeup (Problem, Impact, Architecture, Results, Limitations, Assets)
 
@@ -128,78 +171,5 @@ No full streaming pipeline; batch-only for Kaggle scope.
 
 ## 📑 License
 MIT
-
-
-
-## To run
-
-
-# SF311 Triage with BigQuery AI
-
-This project demonstrates how to build an intelligent triage agent for SF311 service requests using BigQuery's built-in AI capabilities.
-
----
-## Setup and Run Instructions
-
-Follow these steps in order in a Google Cloud Shell environment. This process involves a manual step to copy and paste a service account ID from the Google Cloud Console.
-
-### Step 1: Clone Repository and Set Project
-
-First, clone the repository and configure your active Google Cloud project.
-```bash
-git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git](https://github.com/nithingodi/sf311-triage-bigquery-ai.git)
-cd sf311-triage-bigquery-ai
-gcloud config set project final-triage-project
-```
-
-### Step 2: Grant Your User Permissions (One-Time Setup)
-
-This is a one-time setup for your user account in this project. It grants the permissions needed to create and manage BigQuery connections.
-```bash
-USER_EMAIL=$(gcloud config get-value account)
-gcloud projects add-iam-policy-binding final-triage-project \
-    --member="user:$USER_EMAIL" \
-    --role="roles/iam.serviceAccountUser"
-echo "Waiting 60 seconds for permissions to become active..."
-sleep 60
-```
-
-### Step 3: Create BigQuery Resources
-
-Run the following commands to create the necessary BigQuery dataset and connection.
-```bash
-# Create the dataset
-bq mk --dataset --location=US final-triage-project:sf311
-
-# Create the connection
-bq mk --connection --location=US --project_id=final-triage-project --connection_type=CLOUD_RESOURCE sf311-conn
-```
-
-### Step 4: Find and Copy the Service Account ID (Manual UI Step)
-
-Now, you will navigate to the Google Cloud Console to find the service account that was just created.
-
-1.  **Open this link in a new tab:** [BigQuery Connections](https://console.cloud.google.com/bigquery/connections)
-2.  Make sure you have the correct project (`final-triage-project`) selected at the top of the page.
-3.  Click on the connection named **`us.sf311-conn`**.
-4.  On the "Connection info" screen, find the **Service account ID** field and click the **Copy** icon next to it. It will look like `bqcx-...@gcp-sa-bigquery-condel.iam.gserviceaccount.com`.
-
-
-
-### Step 5: Grant Permissions to the Service Account (Manual Paste Step)
-
-Come back to your Cloud Shell terminal. **Paste the service account ID** you just copied into the command below, replacing `<PASTE_YOUR_SERVICE_ACCOUNT_ID_HERE>`.
-```bash
-gcloud projects add-iam-policy-binding final-triage-project \
-    --member="serviceAccount:<PASTE_YOUR_SERVICE_ACCOUNT_ID_HERE>" \
-    --role="roles/aiplatform.user"
-```
-
-### Step 6: Run the Project
-
-Now that the manual setup is complete, run the project's data processing and model creation steps using the `make` command.
-```bash
-make run_all
-```
 
 
