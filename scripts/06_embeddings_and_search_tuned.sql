@@ -1,136 +1,99 @@
--- Project: City311 Multimodal Triage with BigQuery AI
--- Script: 06_embeddings_and_search_tuned.sql
--- Purpose:
---   Build theme-aware case embeddings and run a two-stage vector match
--- Inputs:
---   embed_text model, batch_case_summaries, batch_triage_raw_v2, policy_chunks
--- Outputs:
---   policy_embeddings, case_query_embeddings_v2, _matches_all_vsearch,
---   batch_policy_matches_precise, batch_policy_matches_global, batch_policy_matches_v2
--- Idempotency: CREATE OR REPLACE (safe)
-
--- ===========
--- PARAMETERS
--- ===========
-DECLARE project_id  STRING  DEFAULT "@PROJECT_ID";
-DECLARE dataset     STRING  DEFAULT "@DATASET";
-DECLARE top_k       INT64   DEFAULT 5;
-DECLARE cutoff      FLOAT64 DEFAULT 0.50;
-
--- ==========================================================
--- Policy embeddings
--- ==========================================================
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE TABLE `%s.%s.policy_embeddings` AS
-SELECT policy_id, title, chunk_text, target_theme, source_url,
-       ml_generate_embedding_result AS embedding
+-- Creates embeddings for the policy catalog.
+CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_embeddings` AS
+SELECT
+  policy_id,
+  title,
+  chunk_text,
+  target_theme,
+  source_url,
+  ml_generate_embedding_result AS embedding
 FROM ML.GENERATE_EMBEDDING(
-  MODEL `%s.%s.embed_text`,
-  (SELECT policy_id, title, chunk_text, target_theme, source_url, chunk_text AS content
-   FROM `%s.%s.policy_chunks`),
+  MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
+  (
+    SELECT policy_id, title, chunk_text, target_theme, source_url, chunk_text AS content
+    FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
+  ),
   STRUCT(TRUE AS flatten_json_output)
 );
-""", project_id, dataset, project_id, dataset, project_id, dataset);
 
--- ==========================================================
--- Case embeddings
--- ==========================================================
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE TABLE `%s.%s.case_query_embeddings_v2` AS
+-- Creates theme-aware embeddings for each user complaint.
+CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.case_query_embeddings_v2` AS
 WITH parsed AS (
-  SELECT r.service_request_id,
-         COALESCE(JSON_VALUE(SAFE.PARSE_JSON(r.out_text),'$.theme'),'') AS theme,
-         s.summary
-  FROM `%s.%s.batch_triage_raw_v2` r
-  JOIN `%s.%s.batch_case_summaries` s USING (service_request_id)
+  SELECT
+    r.service_request_id,
+    COALESCE(JSON_VALUE(triage_result, '$.theme'), '') AS theme,
+    s.summary
+  FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2` AS r
+  JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.batch_case_summaries` AS s USING (service_request_id)
   WHERE s.summary IS NOT NULL
 )
-SELECT service_request_id, theme, summary,
-       ml_generate_embedding_result AS embedding
+SELECT
+  service_request_id,
+  theme,
+  summary,
+  ml_generate_embedding_result AS embedding
 FROM ML.GENERATE_EMBEDDING(
-  MODEL `%s.%s.embed_text`,
-  (SELECT service_request_id, theme, summary,
-          CONCAT('Theme: ', theme, '. Summary: ', summary) AS content
-   FROM parsed),
+  MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
+  (
+    SELECT
+      service_request_id,
+      theme,
+      summary,
+      CONCAT('Theme: ', theme, '. Summary: ', summary) AS content
+    FROM parsed
+  ),
   STRUCT(TRUE AS flatten_json_output)
 );
-""", project_id, dataset,
-     project_id, dataset,
-     project_id, dataset,
-     project_id, dataset);
 
--- ==========================================================
--- Vector search matches (pool)
--- ==========================================================
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE TABLE `%s.%s._matches_all_vsearch` AS
+-- Performs a vector search to find the top 5 potential policy matches for each case.
+CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@._matches_all_vsearch` AS
 SELECT
   vs.query.service_request_id,
-  vs.query.theme            AS case_theme,
+  vs.query.theme AS case_theme,
   vs.query.summary,
   vs.base.policy_id,
-  vs.base.title             AS policy_title,
-  vs.base.chunk_text        AS policy_snippet,
+  vs.base.title AS policy_title,
+  vs.base.chunk_text AS policy_snippet,
   vs.base.target_theme,
   vs.base.source_url,
-  vs.distance               AS cosine_distance
+  vs.distance AS cosine_distance
 FROM VECTOR_SEARCH(
-  TABLE `%s.%s.policy_embeddings`,
+  TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_embeddings`,
   'embedding',
-  TABLE `%s.%s.case_query_embeddings_v2`,
-  top_k => %d,
+  TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.case_query_embeddings_v2`,
+  'embedding',
+  top_k => 5,
   distance_type => 'COSINE'
-) AS vs;
-""", project_id, dataset,
-     project_id, dataset,
-     project_id, dataset,
-     top_k);
+);
 
--- ==========================================================
--- Precise theme-consistent matches
--- ==========================================================
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE TABLE `%s.%s.batch_policy_matches_precise` AS
+-- Finds the best match where the AI-generated theme matches the policy's theme.
+CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_precise` AS
 SELECT * EXCEPT(rn)
 FROM (
-  SELECT m.*,
-         ROW_NUMBER() OVER (PARTITION BY m.service_request_id ORDER BY m.cosine_distance) AS rn
-  FROM `%s.%s._matches_all_vsearch` m
+  SELECT
+    m.*,
+    ROW_NUMBER() OVER (PARTITION BY m.service_request_id ORDER BY m.cosine_distance) AS rn
+  FROM `@@PROJECT_ID@@.@@DATASET_ID@@._matches_all_vsearch` AS m
   WHERE LOWER(m.case_theme) = LOWER(m.target_theme)
 )
-WHERE rn = 1 AND cosine_distance <= %f;
-""", project_id, dataset,
-     project_id, dataset,
-     cutoff);
+WHERE rn = 1 AND cosine_distance <= 0.50;
 
--- ==========================================================
--- Global fallback matches
--- ==========================================================
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE TABLE `%s.%s.batch_policy_matches_global` AS
+-- Finds the best overall match for cases that didn't have a precise theme match.
+CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_global` AS
 SELECT * EXCEPT(rn)
 FROM (
-  SELECT m.*,
-         ROW_NUMBER() OVER (PARTITION BY m.service_request_id ORDER BY m.cosine_distance) AS rn
-  FROM `%s.%s._matches_all_vsearch` m
+  SELECT
+    m.*,
+    ROW_NUMBER() OVER (PARTITION BY m.service_request_id ORDER BY m.cosine_distance) AS rn
+  FROM `@@PROJECT_ID@@.@@DATASET_ID@@._matches_all_vsearch` AS m
   WHERE m.service_request_id NOT IN (
-    SELECT service_request_id FROM `%s.%s.batch_policy_matches_precise`
+    SELECT service_request_id FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_precise`
   )
 )
-WHERE rn = 1 AND cosine_distance <= %f;
-""", project_id, dataset,
-     project_id, dataset,
-     project_id, dataset,
-     cutoff);
+WHERE rn = 1 AND cosine_distance <= 0.50;
 
--- ==========================================================
--- Union of precise + fallback
--- ==========================================================
-EXECUTE IMMEDIATE FORMAT("""
-CREATE OR REPLACE TABLE `%s.%s.batch_policy_matches_v2` AS
-SELECT * FROM `%s.%s.batch_policy_matches_precise`
+-- Combines the precise and global matches into a final table.
+CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_v2` AS
+SELECT * FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_precise`
 UNION ALL
-SELECT * FROM `%s.%s.batch_policy_matches_global`;
-""", project_id, dataset,
-     project_id, dataset,
-     project_id, dataset);
+SELECT * FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_global`;
