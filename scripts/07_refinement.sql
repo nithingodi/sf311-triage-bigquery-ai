@@ -1,5 +1,5 @@
 -- Inserts refined triage results into the final table
-INSERT INTO @@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_policy_refined_v2 (
+INSERT INTO `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_policy_refined_v2` (
   service_request_id,
   summary,
   summary_source,
@@ -16,7 +16,7 @@ WITH refined AS (
   SELECT
     t.*,
     ML.GENERATE_TEXT(
-      MODEL @@PROJECT_ID@@.@@DATASET_ID@@.gemini_text,
+      MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
       STRUCT(
         CONCAT(
           'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
@@ -26,7 +26,7 @@ WITH refined AS (
       ),
       STRUCT(0.0 AS temperature)
     ).ml_generate_text_result AS refined_action
-  FROM @@PROJECT_ID@@.@@DATASET_ID@@.triage_todo_v2 AS t
+  FROM `@@PROJECT_ID@@.@@DATASET_ID@@.triage_todo_v2` AS t
 )
 SELECT
   service_request_id,
