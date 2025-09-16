@@ -24,14 +24,22 @@ VALUES
   ('pw_waste_001','Human/Animal Waste - Public Right of Way', 'Public Works responds to reports of human or animal waste in the public right of way submitted via 311. Provide exact location and nearest cross street.', 'https://sfpublicworks.org/services/garbage-and-waste','Human/Animal Waste'),
   ('pw_waste_needle_002','Needles/Medical Waste - How to Report', 'Improperly disposed needles or medical waste should be reported through 311; do not handle needles yourself.', 'https://sfpublicworks.org/services/report-problem','Human/Animal Waste');
 
--- Creates the policy_catalog table by joining the chunks with their embeddings.
+---------------------------------------------------------
+-- Line edited: Created a CTE for embeddings to avoid scalar subquery errors
+WITH chunks_for_embedding AS (
+  SELECT
+    policy_id,
+    chunk_text AS content
+  FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
+)
+
+-- Creates the policy_catalog table by joining the chunks with their embeddings
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_catalog` AS
 SELECT
   pc.* EXCEPT(chunk_text),
   emb.content,
   emb.ml_generate_embedding_result AS embedding
-FROM
-  `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks` AS pc
+FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks` AS pc
 LEFT JOIN (
   SELECT
     policy_id,
@@ -39,18 +47,13 @@ LEFT JOIN (
     ml_generate_embedding_result
   FROM ML.GENERATE_EMBEDDING(
     MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
-    TABLE (
-      (SELECT
-         policy_id,
-         chunk_text AS content
-       FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`)
-    )
+    TABLE chunks_for_embedding
   )
 ) AS emb
 ON emb.policy_id = pc.policy_id;
 
-
--- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
+---------------------------------------------------------
+-- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
 SELECT
   pc.policy_id,
