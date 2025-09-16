@@ -7,10 +7,11 @@ LOCATION := US
 BQ_CONNECTION_ID := sf311-conn
 
 # --- Main Target ---
-# This now only runs the SQL scripts, assuming setup is done manually.
+# This now runs all scripts in the correct order.
 .PHONY: run_all
-run_all: models views # Add other SQL targets here as needed
+run_all: models views quality_and_cohorts image_summaries case_summaries triage policy_catalog embeddings refinement dashboards comparison
 	@echo "\n✅ All project scripts completed successfully!"
+
 
 # --- SQL Execution Helper ---
 define RUN_SQL
@@ -22,12 +23,35 @@ define RUN_SQL
 		scripts/$(1) | bq query --project_id=$(PROJECT_ID) --nouse_legacy_sql
 endef
 
+
 # --- Individual SQL Script Targets ---
-.PHONY: models views
+.PHONY: models views quality_and_cohorts image_summaries case_summaries triage policy_catalog embeddings refinement dashboards comparison
 models:
 	$(call RUN_SQL,02_models.sql)
 views:
 	$(call RUN_SQL,02_views.sql)
+quality_and_cohorts:
+	$(call RUN_SQL,03_quality_and_cohorts.sql)
+image_summaries:
+	$(call RUN_SQL,03_image_summaries.sql)
+case_summaries:
+	$(call RUN_SQL,04_case_summaries.sql)
+triage:
+	$(call RUN_SQL,04_triage_generate_v2.sql)
+policy_catalog:
+	$(call RUN_SQL,05_label_taxonomy.sql)
+	$(call RUN_SQL,05_policy_catalog.sql)
+	$(call RUN_SQL,05_policy_catalog_upsert.sql)
+embeddings:
+	$(call RUN_SQL,06_embeddings_and_search_tuned.sql)
+refinement:
+	$(call RUN_SQL,07_refine_prep.sql)
+	$(call RUN_SQL,07_refinement.sql)
+dashboards:
+	$(call RUN_SQL,08_dashboards.sql)
+comparison:
+	$(call RUN_SQL,09_proto_comparison.sql)
+
 
 # --- Cleanup Target ---
 .PHONY: clean
