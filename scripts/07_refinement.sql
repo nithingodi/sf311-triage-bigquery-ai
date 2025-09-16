@@ -17,12 +17,13 @@ WITH refined AS (
     t.*,
     ML.GENERATE_TEXT(
       MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
-      STRUCT(
-        CONCAT(
-          'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
-          '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
-          '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
-        ) AS prompt
+      (
+        SELECT
+          CONCAT(
+            'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
+            '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
+            '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
+          ) AS prompt
       ),
       STRUCT(0.0 AS temperature)
     ).ml_generate_text_result AS refined_action
