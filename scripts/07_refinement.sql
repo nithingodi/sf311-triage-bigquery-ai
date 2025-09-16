@@ -1,3 +1,4 @@
+-- Inserts refined triage results into the final table
 INSERT INTO `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_policy_refined_v2` (
   service_request_id,
   summary,
@@ -17,16 +18,14 @@ WITH refined AS (
     ML.GENERATE_TEXT(
       MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
       TABLE (
-        SELECT AS STRUCT
-          CONCAT(
-            'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
-            '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
-            '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
-          ) AS prompt
-      )
-      , -- <-- A comma is needed here
+        SELECT CONCAT(
+          'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
+          '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
+          '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
+        ) AS prompt
+      ),
       JSON '{"temperature": 0.0}'
-    ) AS llm_result
+    ).ml_generate_text_result AS refined_action
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.triage_todo_v2` AS t
 )
 SELECT
@@ -39,10 +38,11 @@ SELECT
   policy_title,
   policy_snippet,
   source_url,
-  llm_result.ml_generate_text_result AS refined_action,
+  refined_action,
+  -- Simple alignment check based on keywords
   IF(
     REGEXP_CONTAINS(
-      LOWER(llm_result.ml_generate_text_result),
+      LOWER(refined_action),
       LOWER(SPLIT(policy_title, ' ')[SAFE_OFFSET(0)])
     ),
     'aligned', 'review'
