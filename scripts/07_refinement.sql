@@ -15,18 +15,19 @@ INSERT INTO `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_policy_refined_v2` (
 WITH refined AS (
   SELECT
     t.*,
-    ML.GENERATE_TEXT(
-      MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
+    AI.GENERATE(
       (
-        SELECT
+        SELECT AS STRUCT
           CONCAT(
             'Policy: ', t.policy_title, '\nSnippet: ', t.policy_snippet,
             '\nComplaint: ', t.summary, '\nOriginal action: ', t.original_action,
             '\nRewrite the action to strictly follow the policy. Respond with one imperative sentence only.'
           ) AS prompt
       ),
-      STRUCT(0.0 AS temperature)
-    ).ml_generate_text_result AS refined_action
+      connection_id => 'projects/@@PROJECT_ID@@/locations/@@LOCATION@@/connections/sf311-conn',
+      endpoint => 'gemini-2.0-flash-001',
+      model_params => JSON '{"generation_config":{"temperature": 0.0}}'
+    ).result AS refined_action
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.triage_todo_v2` AS t
 )
 SELECT
