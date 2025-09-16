@@ -1,4 +1,4 @@
--- Creates embeddings for the policy catalog.
+-- 1) Generate embeddings for the policy catalog
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_embeddings` AS
 SELECT
   policy_id,
@@ -10,13 +10,19 @@ SELECT
 FROM ML.GENERATE_EMBEDDING(
   MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
   (
-    SELECT policy_id, title, chunk_text, target_theme, source_url, chunk_text AS content
+    SELECT
+      policy_id,
+      title,
+      chunk_text,
+      target_theme,
+      source_url,
+      chunk_text AS content
     FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
   ),
   STRUCT(TRUE AS flatten_json_output)
 );
 
--- Creates theme-aware embeddings for each user complaint.
+-- 2) Generate embeddings for user complaints
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.case_query_embeddings_v2` AS
 WITH parsed AS (
   SELECT
@@ -24,7 +30,8 @@ WITH parsed AS (
     COALESCE(JSON_VALUE(triage_result, '$.theme'), '') AS theme,
     s.summary
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2` AS r
-  JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.batch_case_summaries` AS s USING (service_request_id)
+  JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.batch_case_summaries` AS s
+  USING (service_request_id)
   WHERE s.summary IS NOT NULL
 )
 SELECT
@@ -45,18 +52,18 @@ FROM ML.GENERATE_EMBEDDING(
   STRUCT(TRUE AS flatten_json_output)
 );
 
--- Performs a vector search to find the top 5 potential policy matches for each case.
+-- 3) Vector search to find top 5 potential policy matches
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@._matches_all_vsearch` AS
 SELECT
-  vs.query.service_request_id,
-  vs.query.theme AS case_theme,
-  vs.query.summary,
-  vs.base.policy_id,
-  vs.base.title AS policy_title,
-  vs.base.chunk_text AS policy_snippet,
-  vs.base.target_theme,
-  vs.base.source_url,
-  vs.distance AS cosine_distance
+  query.service_request_id,
+  query.theme AS case_theme,
+  query.summary,
+  base.policy_id,
+  base.title AS policy_title,
+  base.chunk_text AS policy_snippet,
+  base.target_theme,
+  base.source_url,
+  distance AS cosine_distance
 FROM VECTOR_SEARCH(
   TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_embeddings`,
   'embedding',
@@ -66,7 +73,7 @@ FROM VECTOR_SEARCH(
   distance_type => 'COSINE'
 );
 
--- Finds the best match where the AI-generated theme matches the policy's theme.
+-- 4) Best match where case theme matches policy theme
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_precise` AS
 SELECT * EXCEPT(rn)
 FROM (
@@ -78,7 +85,7 @@ FROM (
 )
 WHERE rn = 1 AND cosine_distance <= 0.50;
 
--- Finds the best overall match for cases that didn't have a precise theme match.
+-- 5) Best overall match for remaining cases
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_global` AS
 SELECT * EXCEPT(rn)
 FROM (
@@ -92,7 +99,7 @@ FROM (
 )
 WHERE rn = 1 AND cosine_distance <= 0.50;
 
--- Combines the precise and global matches into a final table.
+-- 6) Combine precise and global matches
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_v2` AS
 SELECT * FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_policy_matches_precise`
 UNION ALL
