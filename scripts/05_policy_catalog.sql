@@ -25,19 +25,18 @@ VALUES
   ('pw_waste_needle_002','Needles/Medical Waste - How to Report', 'Improperly disposed needles or medical waste should be reported through 311; do not handle needles yourself.', 'https://sfpublicworks.org/services/report-problem','Human/Animal Waste');
 
 
--- Creates the policy_catalog table with a single batch-run of ML.GENERATE_EMBEDDING.
+-- Creates the policy_catalog table by joining the chunks with their embeddings.
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_catalog` AS
 SELECT
-  policy_id,
-  title,
-  chunk_text,
-  source_url,
-  target_theme,
-  ml.generate_embedding(
+  pc.*,
+  emb.embedding AS embedding
+FROM
+  `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks` AS pc,
+  ML.GENERATE_EMBEDDING(
     MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.embed_text`,
     TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`
-  ) AS embedding
-FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks`;
+  ) AS emb
+WHERE emb.content = pc.chunk_text;
 
 -- Creates a validation view to check if themes in the policy catalog exist in the label taxonomy.
 CREATE OR REPLACE VIEW `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks_validation` AS
