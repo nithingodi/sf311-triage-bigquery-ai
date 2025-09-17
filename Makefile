@@ -9,7 +9,7 @@ BQ_CONNECTION_ID := sf311-conn
 # --- Main Target ---
 # This now runs all scripts in the correct order.
 .PHONY: run_all
-run_all: models views quality_and_cohorts image_summaries case_summaries triage policy_catalog embeddings refinement dashboards comparison
+run_all: models views quality_and_cohorts policy_ingestion image_summaries case_summaries triage policy_catalog embeddings refinement dashboards comparison
 	@echo "\n✅ All project scripts completed successfully!"
 
 
@@ -25,13 +25,15 @@ endef
 
 
 # --- Individual SQL Script Targets ---
-.PHONY: models views quality_and_cohorts image_summaries case_summaries triage policy_catalog embeddings refinement dashboards comparison
+.PHONY: models views quality_and_cohorts policy_ingestion image_summaries case_summaries triage policy_catalog embeddings refinement dashboards comparison
 models:
 	$(call RUN_SQL,02_models.sql)
 views:
 	$(call RUN_SQL,02_views.sql)
 quality_and_cohorts:
 	$(call RUN_SQL,03_quality_and_cohorts.sql)
+policy_ingestion:
+	$(call RUN_SQL,01_policy_ingestion.sql)
 image_summaries:
 	$(call RUN_SQL,03_image_summaries.sql)
 case_summaries:
