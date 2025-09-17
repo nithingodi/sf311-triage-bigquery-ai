@@ -46,7 +46,7 @@ sf311-triage-bigquery-ai/
 ├── diagrams/architecture.png
 ├── exports/ # optional CSVs for visuals
 ├── scripts/
-│ 00_bootstrap.sh
+│ 01_policy_ingestion.sql
 │ 02_models.sql
 │ 02_views.sql
 │ 03_quality_and_cohorts.sql
@@ -73,7 +73,7 @@ sf311-triage-bigquery-ai/
 
 1.  Clone the repository and set up the project:
     ```bash
-    git clone https://github.com/nithingodi/sf311-triage-bigquery-ai.git
+    git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git](https://github.com/nithingodi/sf311-triage-bigquery-ai.git)
     cd sf311-triage-bigquery-ai
     gcloud config set project final-triage-project
     ```
@@ -87,28 +87,24 @@ sf311-triage-bigquery-ai/
     sleep 60
     ```
 
-3.  Create BigQuery dataset and connections:
+3.  Create BigQuery dataset and a unified connection:
     ```bash
     # Create dataset
     bq mk --dataset --location=US final-triage-project:sf311
 
-    # Create Gemini connection for Vertex AI
+    # Create a unified connection for both Vertex AI (Gemini) and GCS
     bq mk --connection --location=US --project_id=final-triage-project \
-        --connection_type=CLOUD_RESOURCE sf311-gemini-conn
-    GEM_SA=$(bq show --connection --format=json final-triage-project.US.sf311-gemini-conn | jq -r '.cloudResource.serviceAccountId')
-    gcloud projects add-iam-policy-binding final-triage-project \
-        --member="serviceAccount:${GEM_SA}" \
-        --role="roles/aiplatform.user"
-    sleep 60
+        --connection_type=CLOUD_RESOURCE sf311-conn
 
-    # Create GCS connection for object table
-    bq mk --connection --location=US --project_id=final-triage-project \
-        --connection_type=CLOUD_RESOURCE sf311-gcs-conn
-    GCS_SA=$(bq show --connection --format=json final-triage-project.US.sf311-gcs-conn | jq -r '.cloudResource.serviceAccountId')
-    gcloud storage buckets create gs://final-triage-project-sf311-data --location=US --uniform-bucket-level-access
-    gcloud storage cp -n /dev/null gs://final-triage-project-sf311-data/sf311_cohort/images/.keep
-    gcloud storage buckets add-iam-policy-binding gs://final-triage-project-sf311-data \
-        --member="serviceAccount:${GCS_SA}" \
+    # Get service account IDs
+    CONNECTION_SA=$(bq show --connection --format=json final-triage-project.US.sf311-conn | jq -r '.cloudResource.serviceAccountId')
+
+    # Grant IAM roles to the unified connection service account
+    gcloud projects add-iam-policy-binding final-triage-project \
+        --member="serviceAccount:${CONNECTION_SA}" \
+        --role="roles/aiplatform.user"
+    gcloud projects add-iam-policy-binding final-triage-project \
+        --member="serviceAccount:${CONNECTION_SA}" \
         --role="roles/storage.objectViewer"
     sleep 60
     ```
@@ -116,19 +112,19 @@ sf311-triage-bigquery-ai/
 4.  Create object table for images:
     ```bash
     bq query --nouse_legacy_sql "
-    CREATE OR REPLACE EXTERNAL TABLE `final-triage-project.sf311.images_obj_cohort`
-    WITH CONNECTION `projects/final-triage-project/locations/US/connections/sf311-gcs-conn`
+    CREATE OR REPLACE EXTERNAL TABLE \`final-triage-project.sf311.images_obj_cohort\`
+    WITH CONNECTION \`projects/final-triage-project/locations/US/connections/sf311-conn\`
     OPTIONS (
       object_metadata = 'SIMPLE',
       uris = ['gs://final-triage-project-sf311-data/sf311_cohort/images/*']
     );"
     ```
 
-5.  Run the full pipeline:
+5.  Run the full pipeline (includes data ingestion):
     ```bash
     make run_all
     ```
-    - Note: Ensure `02_models.sql` and `03_image_summaries.sql` use `gemini-2.0-flash-001` as the endpoint (update scripts if needed).
+    - Note: The `make run_all` command now automatically ingests the policy data and sets up the full pipeline.
 
 ---
 
@@ -149,6 +145,7 @@ bq query --nouse_legacy_sql \
 
 bq query --nouse_legacy_sql \
   'SELECT * FROM `final-triage-project.sf311.v_mismatch_examples`' > exports/mismatch_examples.csv
+
 ```
 
 ## 📋 Submission Checklist
