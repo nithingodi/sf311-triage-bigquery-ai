@@ -12,8 +12,8 @@ STRUCT('PARK_DAYLIGHT' AS policy_id, 'Crosswalk Daylighting (AB 413)' AS title,
 'https://www.sfmta.com/press-releases/press-release-sfmta-acting-transportation-director-announces-plan-fair-enforcement-californias-daylighting-law' AS source_url,
 'Illegal Parking' AS target_theme),
 STRUCT('PARK_72HR' AS policy_id, '72-Hour Rule' AS title,
-'A vehicle may not remain parked in the same spot on a public street for more than 72 hours;
-may be warned, cited, or towed.' AS chunk_text,
+'A vehicle may not remain parked in the same spot on a public street for more than 72 hours; ' ||
+'may be warned, cited, or towed.' AS chunk_text,
 'https://www.sfmta.com/blog/san-francisco-parking-tips-72-hour-rule' AS source_url,
 'Abandoned Vehicle' AS target_theme),
 -- Clean & safe public realm
