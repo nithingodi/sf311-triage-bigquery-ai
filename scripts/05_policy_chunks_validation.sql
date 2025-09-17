@@ -10,4 +10,4 @@ SELECT
   END AS theme_status
 FROM `@@PROJECT_ID@@.@@DATASET_ID@@.policy_chunks` pc
 LEFT JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.label_taxonomy` lt
-  ON LOWER(pc.target_theme) = LOWER(lt.label_value) AND lt.label_type = 'theme';
+  ON LOWER(pc.target_theme) = LOWER(lt.label_value);
