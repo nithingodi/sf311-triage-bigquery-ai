@@ -73,9 +73,9 @@ sf311-triage-bigquery-ai/
 
 1.  Clone the repository and set up the project:
     ```bash
-    git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git](https://github.com/nithingodi/sf311-triage-bigquery-ai.git)
+    git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git]
     cd sf311-triage-bigquery-ai
-    gcloud config set project final-triage-project
+    gcloud config set project sf311-471122
     ```
 
 2.  Grant user permissions (one-time setup):
