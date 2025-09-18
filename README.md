@@ -173,7 +173,5 @@ The repository is organized with all SQL scripts in a dedicated directory and a 
 
 This project is licensed under the MIT License.
 
-## 📑 License
-MIT
 
 
