@@ -164,9 +164,20 @@ The repository is organized with all SQL scripts in a dedicated directory and a 
 
 ## ⚠️ Limitations
 
-* **Small Policy Catalog**: The current policy catalog was hand-curated for this prototype. A production deployment would require a more robust ingestion pipeline for the full set of city codes.
-* **Batch Processing Only**: The pipeline is designed for batch execution as required by the Kaggle competition scope and does not include a real-time streaming architecture.
+* **Small Policy Catalog**: The current policy catalog was hand-curated for this prototype. A production deployment would require a more robust ingestion pipeline to automatically parse and index the full set of city codes and policy documents.
+* **Batch-Only Architecture**: The pipeline is designed for batch execution as required by the Kaggle competition scope. It does not include a real-time streaming architecture for immediate, on-arrival complaint processing.
 
+---
+
+## 🚀 Future Work
+
+The current architecture serves as a powerful foundation for several exciting enhancements:
+
+* **Generalization to New Business Domains**: This agent's pattern can be adapted for various business purposes that involve multimodal input and require policy-aligned resolutions. Adapting the agent would involve modifying the initial data preparation scripts to handle the new domain's data structure, creating a new, domain-specific policy catalog, and tuning the AI prompts for the specific use case (e.g., customer support, insurance claims).
+
+* **Enhanced Case-Based Reasoning**: The retrieval step could be enhanced to search not only a static policy catalog but also a historical database of similar, successfully resolved complaints. This would allow the agent to learn from past precedent and suggest proven solutions, potentially reducing the need for a full vector search in common scenarios.
+
+* **Real-Time Streaming Pipeline**: The batch architecture could be evolved into a real-time streaming service using **Cloud Functions** and **Pub/Sub**. This would allow complaints to be triaged, classified, and matched to policies within seconds of their submission.
 ---
 
 ## 📑 License
