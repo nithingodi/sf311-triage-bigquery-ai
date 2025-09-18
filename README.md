@@ -140,10 +140,24 @@ sf311-triage-bigquery-ai/
 ├── survey.txt
 ├── .gitignore
 └── scripts
-├── 01_policy_ingestion.sql
-├── 02_models.sql
-├── 02_views.sql
-├── ... (all other SQL scripts)
+    ├── 01_policy_ingestion.sql
+    ├── 02_models.sql
+    ├── 02_views.sql
+    ├── 03_image_summaries.sql
+    ├── 03_quality_and_cohorts.sql
+    ├── 04_case_summaries.sql
+    ├── 04_triage_generate_v2.sql
+    ├── 05_label_taxonomy.sql
+    ├── 05_policy_catalog.sql
+    ├── 05_policy_chunks_for_embedding.sql
+    ├── 05_policy_chunks_validation.sql
+    ├── 05_policy_embeddings.sql
+    ├── 06_embeddings_and_search_tuned.sql
+    ├── 07_refine_prep.sql
+    ├── 07_refinement.sql
+    ├── 08_dashboards.sql
+    ├── 09_proto_comparison.sql
+    └── 10_validation.sql
 
 
 ---
