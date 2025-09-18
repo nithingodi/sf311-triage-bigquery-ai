@@ -1,4 +1,4 @@
-# City311 Multimodal Triage with BigQuery AI
+## City311 Multimodal Triage with BigQuery AI
 
 This repository contains a SQL-first prototype for a multimodal triage agent that processes San Francisco 311 service requests. The entire pipeline is orchestrated within Google BigQuery, leveraging its native AI capabilities to classify unstructured complaints, match them to official city policies using vector search, and generate refined, policy-aligned actions.
 ---
