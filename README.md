@@ -67,14 +67,14 @@ The entire pipeline can be reproduced from a Google Cloud Shell environment. The
 
     ```bash
     # --- IMPORTANT: UPDATE THIS VARIABLE ---
-    export GCLOUD_PROJECT="your-gcp-project-id-here"
+    export GCLOUD_PROJECT="your-project-id"
     # ---
-
     gcloud config set project $GCLOUD_PROJECT
     cd ~
     rm -rf sf311-triage-bigquery-ai
-    git clone [https://github.com/nithingodi/sf311-triage-bigquery-ai.git](https://github.com/nithingodi/sf311-triage-bigquery-ai.git)
+    git clone https://github.com/nithingodi/sf311-triage-bigquery-ai.git
     cd sf311-triage-bigquery-ai
+
     ```
 
 2.  **Grant User Permissions**: You must grant your user the ability to act as a Service Account User. This is a one-time setup step for your user in this project.
