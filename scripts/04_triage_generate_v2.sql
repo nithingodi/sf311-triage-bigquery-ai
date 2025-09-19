@@ -1,10 +1,14 @@
+-- Creates the final triage results table by calling the Gemini model
+-- to extract a structured JSON object from each complaint summary.
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2` AS
 WITH s AS (
+  -- Select all valid summaries from the active cohort
   SELECT service_request_id, summary, summary_source
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.batch_case_summaries`
   WHERE summary IS NOT NULL
 ),
 todo AS (
+  -- Select a batch of summaries that have not yet been triaged
   SELECT s.*
   FROM s
   LEFT JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2` r USING (service_request_id)
@@ -12,6 +16,7 @@ todo AS (
   LIMIT 500
 ),
 prompts AS (
+  -- Construct the detailed prompt for the AI model
   SELECT
     t.service_request_id, t.summary, t.summary_source,
     CONCAT(
