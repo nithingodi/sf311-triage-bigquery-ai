@@ -1,6 +1,14 @@
--- Creates the final triage results table by calling the Gemini model
--- to extract a structured JSON object from each complaint summary.
-CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2` AS
+-- 1) Ensures the destination table exists with the correct schema.
+CREATE TABLE IF NOT EXISTS `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2` (
+  service_request_id STRING,
+  summary STRING,
+  summary_source STRING,
+  triage_result STRING,
+  status STRING
+);
+
+-- 2) Inserts new records into the table. This query is idempotent.
+INSERT INTO `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2`
 WITH s AS (
   -- Select all valid summaries from the active cohort
   SELECT service_request_id, summary, summary_source
@@ -30,13 +38,15 @@ prompts AS (
   FROM todo t
 )
 SELECT
-  service_request_id,
-  summary,
-  summary_source,
-  ml_generate_text_llm_result AS triage_result,
-  ml_generate_text_status AS status
+  p.service_request_id,
+  p.summary,
+  p.summary_source,
+  r.ml_generate_text_llm_result AS triage_result,
+  r.ml_generate_text_status AS status
 FROM ML.GENERATE_TEXT(
   MODEL `@@PROJECT_ID@@.@@DATASET_ID@@.gemini_text`,
   TABLE prompts,
   STRUCT(0.0 AS temperature, 160 AS max_output_tokens, TRUE AS flatten_json_output)
-);
+) AS r
+-- Join back to the prompts table to get the original columns
+JOIN prompts p ON r.prompt = p.prompt;
