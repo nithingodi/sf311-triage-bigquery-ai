@@ -88,7 +88,7 @@ The entire pipeline can be reproduced from a Google Cloud Shell environment. The
     sleep 60
     ```
 
-3.  **Create Core Infrastructure**: The following commands create the necessary BigQuery dataset and the CLOUD_RESOURCE connection that allows BigQuery to communicate with Vertex AI and Google Cloud Storage.
+3.  **Create Core Infrastructure**: The following commands create the necessary BigQuery dataset and the `CLOUD_RESOURCE` connection that allows BigQuery to communicate with Vertex AI and Google Cloud Storage.
 
     ```bash
     # Create the BigQuery dataset
@@ -111,7 +111,19 @@ The entire pipeline can be reproduced from a Google Cloud Shell environment. The
     echo "Waiting 60 seconds for IAM permissions to propagate..."
     sleep 60
     ```
-4.  **Create Object Table for Images**: This step creates the special BigQuery table that points to the image files in Google Cloud Storage. (Note: The GCS bucket must be created and populated separately).
+
+4.  **Prepare Cloud Storage Bucket**: These commands will create a new GCS bucket and upload the local complaint images to it. The object table created in the next step will point to these files.
+
+    ```bash
+    # Create a GCS bucket (bucket names must be globally unique)
+    gsutil mb -l US gs://$GCLOUD_PROJECT-sf311-data
+
+    # Upload the cohort images to the new bucket
+    gsutil -m cp -r data/sf311_cohort/images/* gs://$GCLOUD_PROJECT-sf311-data/sf311_cohort/images/
+    ```
+
+5.  **Create Object Table for Images**: This step creates the special BigQuery table that points to the image files in Google Cloud Storage.
+
     ```bash
     bq query --nouse_legacy_sql "
     CREATE OR REPLACE EXTERNAL TABLE \`$GCLOUD_PROJECT.sf311.images_obj_cohort\`
@@ -122,7 +134,7 @@ The entire pipeline can be reproduced from a Google Cloud Shell environment. The
     );"
     ```
 
-5.  **Run the Full Pipeline**: Execute the `Makefile` target to run all the SQL scripts in the correct order. This will build everything from the views and models to the final comparison metrics.
+6.  **Run the Full Pipeline**: Execute the `Makefile` target to run all the SQL scripts in the correct order. This will build everything from the views and models to the final comparison metrics.
 
     ```bash
     make run_all
