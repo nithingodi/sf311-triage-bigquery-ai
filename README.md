@@ -41,19 +41,28 @@ By summarizing images for cases with poor text, the AI agent dramatically increa
 
 | Cohort | Total Cases | Matched to Policy | Match Rate |
 | :--- | :---: | :---: | :---: |
-| No-AI (Text-only) | 200 | 116 | **58.0%** |
-| With AI (Text+Image) | 400 | 316 | **79.0%** |
+| No-AI (Text-only) | 500 | 240 | **48.0%** |
+| With AI (Text+Image) | 1000 | 740 | **74.0%** |
 
-This represents a **+21-point lift** in the policy match rate, a **36% relative improvement** in performance.
+This represents a **+26-point lift** in the policy match rate, a **54% relative improvement** in performance.
 
 ### Qualitative Impact: Before vs. After
 
 The agent consistently transforms vague summaries and generic actions into specific, policy-aware recommendations.
 
-| Complaint Summary | Original Action | Matched Policy Title | ✅ Refined Action |
-| :--- | :--- | :--- | :--- |
-| Red Tesla Noplate. | Dispatch parking enforcement to investigate and issue a citation. | 72-Hour Rule | **Dispatch parking enforcement to investigate and warn, cite, or tow the vehicle if it has remained in the same spot for over 72 hours.** |
-| Parking Meter. | Dispatch parking enforcement to investigate the meter. | Crosswalk Daylighting (AB 413) | **Dispatch parking enforcement to investigate vehicles parked within 20 feet of the crosswalk.** |
+| Complaint Summary                                                  | Original Action                                              | Matched Policy Title                | ✅ Refined Action                                                                                           |
+|:-------------------------------------------------------------------|:-------------------------------------------------------------|:------------------------------------|:------------------------------------------------------------------------------------------------------------|
+| Case Resolved Closed: No Response From Pg & E Graffiti In 1 Month. | Contact PG&E to address the graffiti issue promptly.         | Graffiti Removal (30 days)          | Notify the property owner of their responsibility to abate the graffiti within 30 days.                     |
+| Other On Metal Pole.                                               | Inspect the metal pole for damage and schedule repairs.      | Graffiti Removal (30 days)          | Issue a notice to the property owner to abate the graffiti within 30 days.                                  |
+| Structure Needs Painting.                                          | Schedule a building inspection to assess the painting needs. | Graffiti Removal (30 days)          | Issue a graffiti removal notice to the property owner, requiring abatement within 30 days.                  |
+| Collapsed Sidewalk.                                                | Dispatch a crew to assess and repair the collapsed sidewalk. | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the hazard and their responsibility to repair the collapsed sidewalk.          |
+| Collapsed Sidewalk.                                                | Dispatch a crew to assess and repair the collapsed sidewalk. | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the hazard and their responsibility to repair the collapsed sidewalk.          |
+| Damaged Side Sewer Vent Cover.                                     | Dispatch a crew to assess and repair the damaged vent cover. | Sidewalk Maintenance (PW Code §706) | Notify the property owner of their responsibility to repair the damaged vent cover.                         |
+| Pavement Defect.                                                   | Dispatch a crew to assess and repair the pavement defect.    | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the pavement defect and their responsibility to repair it.                     |
+| Sidewalk In Front Of Property Offensive.                           | Dispatch a crew to clean the sidewalk.                       | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the sidewalk maintenance requirement and potential nuisance violation.         |
+| Display Merchandise Blocking Sidewalk.                             | Dispatch an inspector to assess the obstruction.             | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the sidewalk obstruction and potential public nuisance.                        |
+| Affixed Improperly.                                                | Inspect the affixed item and ensure proper installation.     | Sidewalk Maintenance (PW Code §706) | Notify the property owner to address the improperly affixed item as a potential hazard and public nuisance. |
+
 
 Additionally, the final refinement step was successful **74.3%** of the time, producing an action that was heuristically aligned with the retrieved policy.
 
