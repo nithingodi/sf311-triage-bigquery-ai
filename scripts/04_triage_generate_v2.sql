@@ -19,7 +19,6 @@ todo AS (
   FROM s
   LEFT JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.batch_triage_raw_v2` r USING (service_request_id)
   WHERE r.service_request_id IS NULL
-  LIMIT 500
 ),
 prompts AS (
   SELECT
