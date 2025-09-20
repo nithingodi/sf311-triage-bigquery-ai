@@ -16,7 +16,6 @@ todo AS (
   FROM fallback_ext f
   LEFT JOIN `@@PROJECT_ID@@.@@DATASET_ID@@.batch_image_summaries` s USING (service_request_id)
   WHERE s.service_request_id IS NULL
-  LIMIT 200
 )
 SELECT
   service_request_id,
