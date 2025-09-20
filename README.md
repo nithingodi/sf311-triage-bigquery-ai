@@ -64,7 +64,7 @@ The agent consistently transforms vague summaries and generic actions into speci
 | Affixed Improperly.                                                | Inspect the affixed item and ensure proper installation.     | Sidewalk Maintenance (PW Code §706) | Notify the property owner to address the improperly affixed item as a potential hazard and public nuisance. |
 
 
-Additionally, the final refinement step was successful **74.3%** of the time, producing an action that was heuristically aligned with the retrieved policy.
+Additionally, the final refinement step was successful **65%** of the time, producing an action that was heuristically aligned with the retrieved policy.
 
 ---
 
