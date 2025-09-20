@@ -84,6 +84,7 @@ The entire pipeline can be reproduced from a Google Cloud Shell environment. The
     git clone https://github.com/nithingodi/sf311-triage-bigquery-ai.git
     cd sf311-triage-bigquery-ai
 
+
     ```
 
 2.  **Grant User Permissions**: You must grant your user the ability to act as a Service Account User. This is a one-time setup step for your user in this project.
@@ -121,29 +122,20 @@ The entire pipeline can be reproduced from a Google Cloud Shell environment. The
     sleep 60
     ```
 
-4.  **Prepare Cloud Storage Bucket**: These commands will create a new GCS bucket and upload the local complaint images to it. The object table created in the next step will point to these files.
 
-    ```bash
-    # Create a GCS bucket (bucket names must be globally unique)
-    gsutil mb -l US gs://$GCLOUD_PROJECT-sf311-data
-
-    # Upload the cohort images to the new bucket
-    gsutil -m cp -r data/sf311_cohort/images/* gs://$GCLOUD_PROJECT-sf311-data/sf311_cohort/images/
-    ```
-
-5.  **Create Object Table for Images**: This step creates the special BigQuery table that points to the image files in Google Cloud Storage.
+4.  **Create Object Table for Images**: This step creates the special BigQuery table that points to the image files in Google Cloud Storage.
 
     ```bash
     bq query --nouse_legacy_sql "
     CREATE OR REPLACE EXTERNAL TABLE \`$GCLOUD_PROJECT.sf311.images_obj_cohort\`
     WITH CONNECTION \`projects/$GCLOUD_PROJECT/locations/US/connections/sf311-conn\`
     OPTIONS (
-      object_metadata = 'SIMPLE',
-      uris = ['gs://$GCLOUD_PROJECT-sf311-data/sf311_cohort/images/*']
+    object_metadata = 'SIMPLE',
+    uris = ['gs://$GCLOUD_PROJECT-sf311-data/sf311_cohort/images/*']
     );"
     ```
 
-6.  **Run the Full Pipeline**: Execute the `Makefile` target to run all the SQL scripts in the correct order. This will build everything from the views and models to the final comparison metrics.
+5.  **Run the Full Pipeline**: Execute the `Makefile` target to run all the SQL scripts in the correct order. This will build everything from the views and models to the final comparison metrics.
 
     ```bash
     make run_all
