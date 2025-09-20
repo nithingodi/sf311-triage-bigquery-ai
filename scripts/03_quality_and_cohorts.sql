@@ -29,30 +29,34 @@ SELECT
 FROM norm;
 
 
--- Creates a demo cohort table with a mix of good text and cases that need image analysis.
+-- Creates a "perfect" 1000-case demo cohort.
 CREATE OR REPLACE TABLE `@@PROJECT_ID@@.@@DATASET_ID@@.batch_ids_demo` AS
 WITH q AS (
   SELECT
     service_request_id,
     is_bad_text,
-    has_media
+    has_media,
+    media_url
   FROM `@@PROJECT_ID@@.@@DATASET_ID@@.cases_text_quality`
 ),
-good AS (
+good_text_cases AS (
   SELECT service_request_id FROM q
   WHERE is_bad_text = FALSE
   ORDER BY RAND()
-  LIMIT 200
+  LIMIT 500 -- Select 500 cases with good text
 ),
-needs_img AS (
+bad_text_with_image_cases AS (
   SELECT service_request_id FROM q
-  WHERE is_bad_text = TRUE AND has_media
+  WHERE is_bad_text = TRUE
+    AND has_media = TRUE
+    -- Ensure the URL is a processable image before selection
+    AND REGEXP_CONTAINS(LOWER(media_url), r"\.(jpg|jpeg|png|gif)(?:$|[?#])")
   ORDER BY RAND()
-  LIMIT 800
+  LIMIT 500 -- Select 500 cases with bad text but a valid image
 )
-SELECT * FROM good
+SELECT * FROM good_text_cases
 UNION ALL
-SELECT * FROM needs_img;
+SELECT * FROM bad_text_with_image_cases;
 
 
 -- Creates a pointer to the active cohort.
