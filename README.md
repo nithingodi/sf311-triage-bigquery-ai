@@ -35,36 +35,51 @@ A visual representation of the end-to-end pipeline.
 
 The multimodal AI agent demonstrated a significant improvement over a traditional, text-only approach by effectively processing complaints that were previously unusable.
 
-### Quantitative Impact
+---
+## 📈 Impact Statement
 
-By summarizing images for cases with poor text, the AI agent dramatically increased the number of complaints that could be successfully matched to a city policy.
+This BigQuery-native AI agent transforms the 311 triage process from a slow, manual task into a fast, consistent, and scalable automated workflow.
 
-| Cohort | Total Cases | Matched to Policy | Match Rate |
-| :--- | :---: | :---: | :---: |
-| No-AI (Text-only) | 500 | 240 | **48.0%** |
-| With AI (Text+Image) | 1000 | 740 | **74.0%** |
+### Business Impact
+By automatically processing complaints and grounding them in official policy, the agent drastically reduces the need for manual intervention.
 
-This represents a **+26-point lift** in the policy match rate, a **54% relative improvement** in performance.
+* **Assumption:** A city agent takes a conservative average of **3 minutes** to manually triage one case.
+* **Performance:** The agent successfully found a relevant policy for **~70%** of the 1,000 cases in the test cohort.
+* **Estimated Impact:** This translates to **35 hours of manual work saved** for every 1,000 complaints processed, freeing up city personnel to focus on more complex case resolution.
 
-### Qualitative Impact: Before vs. After
+### Platform Impact: The Power of BigQuery-Native AI
+Beyond the business outcomes, this project highlights the significant performance and productivity gains of using BigQuery's integrated AI services:
 
-The agent consistently transforms vague summaries and generic actions into specific, policy-aware recommendations.
+* **Cost-Effectiveness:** This entire prototype, including multiple pipeline runs and experiments on a 1000-case cohort, was developed for **under $5 USD**, demonstrating the extreme cost-effectiveness of building and testing sophisticated AI solutions with BigQuery.
+* **Scalability and Speed:** Invoking generative models directly on thousands of rows with a single SQL statement is a game-changer. BigQuery handles the parallel execution and scaling automatically, transforming what would be a complex, slow, row-by-row API loop into a single, efficient query.
+* **Unified Architecture:** The seamless integration of data storage, vector search, and generative AI within one platform radically reduces architectural complexity, removing the need to move data between a data warehouse and a separate vector database.
 
-| Complaint Summary                                                  | Original Action                                              | Matched Policy Title                | ✅ Refined Action                                                                                           |
-|:-------------------------------------------------------------------|:-------------------------------------------------------------|:------------------------------------|:------------------------------------------------------------------------------------------------------------|
-| Case Resolved Closed: No Response From Pg & E Graffiti In 1 Month. | Contact PG&E to address the graffiti issue promptly.         | Graffiti Removal (30 days)          | Notify the property owner of their responsibility to abate the graffiti within 30 days.                     |
-| Other On Metal Pole.                                               | Inspect the metal pole for damage and schedule repairs.      | Graffiti Removal (30 days)          | Issue a notice to the property owner to abate the graffiti within 30 days.                                  |
-| Structure Needs Painting.                                          | Schedule a building inspection to assess the painting needs. | Graffiti Removal (30 days)          | Issue a graffiti removal notice to the property owner, requiring abatement within 30 days.                  |
-| Collapsed Sidewalk.                                                | Dispatch a crew to assess and repair the collapsed sidewalk. | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the hazard and their responsibility to repair the collapsed sidewalk.          |
-| Collapsed Sidewalk.                                                | Dispatch a crew to assess and repair the collapsed sidewalk. | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the hazard and their responsibility to repair the collapsed sidewalk.          |
-| Damaged Side Sewer Vent Cover.                                     | Dispatch a crew to assess and repair the damaged vent cover. | Sidewalk Maintenance (PW Code §706) | Notify the property owner of their responsibility to repair the damaged vent cover.                         |
-| Pavement Defect.                                                   | Dispatch a crew to assess and repair the pavement defect.    | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the pavement defect and their responsibility to repair it.                     |
-| Sidewalk In Front Of Property Offensive.                           | Dispatch a crew to clean the sidewalk.                       | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the sidewalk maintenance requirement and potential nuisance violation.         |
-| Display Merchandise Blocking Sidewalk.                             | Dispatch an inspector to assess the obstruction.             | Sidewalk Maintenance (PW Code §706) | Notify the property owner of the sidewalk obstruction and potential public nuisance.                        |
-| Affixed Improperly.                                                | Inspect the affixed item and ensure proper installation.     | Sidewalk Maintenance (PW Code §706) | Notify the property owner to address the improperly affixed item as a potential hazard and public nuisance. |
+---
+## 🏆 Key Results: A Tale of Two Pipelines
 
+To measure the reliability of the image analysis pipeline, it was run in two modes: a **Baseline** version using public URLs, and an **Improved** version using GCS-hosted images via a BigQuery Object Table. The results revealed a critical insight into building robust AI systems.
 
-Additionally, the final refinement step was successful **65%** of the time, producing an action that was heuristically aligned with the retrieved policy.
+### Quantitative Comparison
+
+| Metric                 | Baseline (Public URL) | ✅ Improved (Object Table) |
+| :--------------------- | :-------------------: | :-----------------------: |
+| Match Rate             |         72.9%         |           69.9%           |
+| Refinement Success     |         67.5%         |           41.3%           |
+
+### Analysis: Uncovering the "Silent Failure"
+### Qualitative Comparison: The "Silent Failure"
+
+The most significant finding was the difference in summary quality for cases where the public URL was inaccessible. The following table shows how the Improved pipeline provides accurate, specific summaries where the Baseline version failed.
+
+| Complaint Type | Baseline Summary (from Public URL) | ✅ Improved Summary (from Object Table) |
+| :--- | :--- | :--- |
+| Damaged Sign | A large pile of trash... | The photo shows a damaged street sign... |
+| Pothole | A large pile of trash... | The photo shows a pothole in the street... |
+| Fallen Tree | A large pile of trash... | A fallen tree branch obstructs the sidewalk... |
+
+While the baseline pipeline scored higher, this was a misleading result caused by the AI model's **"silent failure"** when trying to access unreliable public URLs. Instead of returning an error, the model hallucinated the same generic "pile of trash" summary for many different types of issues. This incorrect summary then consistently (but wrongly) matched with a general-purpose garbage policy.
+
+The improved pipeline, by using reliable `gs://` URIs, generated highly accurate and diverse summaries for issues like "potholes," "damaged street signs," and "fallen tree branches." The lower scores reflect that our small, curated **`policy_catalog` had a "content gap"** and did not contain specific policies for these new, correctly identified problems. This is ultimately a success, as the system is now intelligent enough to identify the precise areas where its knowledge base needs to be expanded.
 
 ---
 
@@ -123,24 +138,51 @@ The entire pipeline can be reproduced from a Google Cloud Shell environment. The
     ```
 
 
-4.  **Create Object Table for Images**: This step creates the special BigQuery table that points to the image files in Google Cloud Storage.
+#### **Running the Pipeline Comparison**
 
+**Step 4: Run the Baseline Pipeline (Public URL Method)**
+This first run establishes the 1000-case cohort (`batch_ids` table) and generates the first set of results.
+```bash
+make run_all
+```
+
+By following the below steps,one can run the pipeline that uses object table to summarize images(baseline uses ai.generate to access public urls)
+
+
+**Step 5: Prepare GCS for the Improved Pipeline**
+Now that the `batch_ids` table exists, this script downloads the corresponding images to your GCS bucket.
+```bash
+python3 scripts/setup_gcs.py
+```
+Next, create object table that points to theose images
+```bash
+bq query --nouse_legacy_sql "
+CREATE OR REPLACE EXTERNAL TABLE \`$GCLOUD_PROJECT.sf311.images_obj_cohort\`
+WITH CONNECTION \`projects/$GCLOUD_PROJECT/locations/US/connections/sf311-conn\`
+OPTIONS (
+  object_metadata = 'SIMPLE',
+  uris = ['gs://$GCLOUD_PROJECT-sf311-data/sf311_cohort/images/*.jpg']
+);"
+```
+**Step 6: Run the Improved Pipeline (Object Table Method)**
+To run the second, more reliable version of the pipeline on the **exact same cohort**:
+1.  **Edit the `Makefile`**: Open the `Makefile` and find the `image_summaries` target. Change the filename from `03_image_summaries.sql` to `03_image_summaries_v2_objtable.sql`.
+2.  **Clean and Re-run**: Run the following commands to clear the old results and then execute the rest of the pipeline manually.
     ```bash
-    bq query --nouse_legacy_sql "
-    CREATE OR REPLACE EXTERNAL TABLE \`$GCLOUD_PROJECT.sf311.images_obj_cohort\`
-    WITH CONNECTION \`projects/$GCLOUD_PROJECT/locations/US/connections/sf311-conn\`
-    OPTIONS (
-    object_metadata = 'SIMPLE',
-    uris = ['gs://$GCLOUD_PROJECT-sf311-data/sf311_cohort/images/*']
-    );"
+    # First, clear the summary results from the last run
+    make clean_summaries
+
+    # Now, run the remaining pipeline steps manually
+    make image_summaries
+    make case_summaries
+    make triage
+    make label_taxonomy
+    make policy_catalog
+    make embeddings
+    make refinement
+    make dashboards
+    make comparison
     ```
-
-5.  **Run the Full Pipeline**: Execute the `Makefile` target to run all the SQL scripts in the correct order. This will build everything from the views and models to the final comparison metrics.
-
-    ```bash
-    make run_all
-    ```
-
 ---
 ## 📂 Project Structure
 
@@ -157,6 +199,7 @@ The repository is organized with all SQL scripts in a dedicated directory and a 
         * `02_models.sql`
         * `02_views.sql`
         * `03_image_summaries.sql`
+        * `03_image_summaries_v2_objtable.sql`
         * `03_quality_and_cohorts.sql`
         * `04_case_summaries.sql`
         * `04_triage_generate_v2.sql`
@@ -171,6 +214,7 @@ The repository is organized with all SQL scripts in a dedicated directory and a 
         * `08_dashboards.sql`
         * `09_proto_comparison.sql`
         * `10_validation.sql`
+        * `setup_gcs.py`
 
 
 ---
@@ -184,13 +228,22 @@ The repository is organized with all SQL scripts in a dedicated directory and a 
 
 ## 🚀 Future Work
 
-The current architecture serves as a powerful foundation for several exciting enhancements:
+This prototype demonstrates that traditional barriers for unstructured data can be overcome with BigQuery AI. It serves as a powerful foundation for several exciting, production-ready enhancements.
 
-* **Generalization to New Business Domains**: This agent's pattern can be adapted for various business purposes that involve multimodal input and require policy-aligned resolutions. Adapting the agent would involve modifying the initial data preparation scripts to handle the new domain's data structure, creating a new, domain-specific policy catalog, and tuning the AI prompts for the specific use case (e.g., customer support, insurance claims).
+### Continuous Model Improvement Loop
+The outputs of this pipeline, especially the actions flagged for `review`, can serve as a valuable feedback mechanism for the underlying Gemini models. By analyzing cases where the AI struggled to generate a policy-aligned action, product teams can identify specific weaknesses and fine-tune future model versions for better instruction-following and reasoning in a RAG context.
 
-* **Enhanced Case-Based Reasoning**: The retrieval step could be enhanced to search not only a static policy catalog but also a historical database of similar, successfully resolved complaints. This would allow the agent to learn from past precedent and suggest proven solutions, potentially reducing the need for a full vector search in common scenarios.
+### Cost-Optimization via Case-Based Reasoning
+Instead of relying on the generative model for every new complaint, the agent could be enhanced to first perform a `VECTOR_SEARCH` for *semantically similar historical complaints*. If a similar, successfully resolved case is found, its `refined_action` can be reused directly. This would significantly reduce calls to the generative AI endpoint, leading to substantial cost savings at scale.
 
-* **Real-Time Streaming Pipeline**: The batch architecture could be evolved into a real-time streaming service using **Cloud Functions** and **Pub/Sub**. This would allow complaints to be triaged, classified, and matched to policies within seconds of their submission.
+### Hybrid Image Processing for Storage Efficiency
+To optimize storage costs and data processing, the image summarization step could be evolved into a two-stage, "on-demand" process. The agent would first attempt to summarize an image using its public URL. **Only if that fails** would it trigger the workflow to download the image to GCS and re-process it using the more reliable Object Table method. This hybrid approach minimizes storage footprint while ensuring high reliability.
+
+### Generalization to New Business Domains
+This agent's pattern can be adapted for other business domains that involve multimodal input and require policy-aligned resolutions, such as customer support ticket triage or insurance claim verification.
+
+### Real-Time Streaming Pipeline
+The batch architecture could be evolved into a real-time streaming service using **Cloud Functions** and **Pub/Sub**. This would allow complaints to be triaged, classified, and matched to policies within seconds of their submission.
 ---
 
 ## 📑 License
