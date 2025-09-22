@@ -6,8 +6,20 @@ DATASET_ID := sf311
 LOCATION := US
 BQ_CONNECTION_ID := sf311-conn
 
+# Controls which image summarization method to use.
+# Options: 'public_url' (default) or 'obj_table' (recommended)
+# To run the object table version, use the command: make run_all IMAGE_METHOD=obj_table
+IMAGE_METHOD ?= public_url
+
+# Determine the correct SQL script based on the chosen method
+ifeq ($(IMAGE_METHOD), obj_table)
+	IMAGE_SCRIPT := 03_image_summaries_v2_objtable.sql
+else
+	IMAGE_SCRIPT := 03_image_summaries.sql
+endif
+
+
 # --- Main Target ---
-# This now runs all scripts in the correct order.
 .PHONY: run_all
 run_all: models views quality_and_cohorts policy_ingestion image_summaries case_summaries triage label_taxonomy policy_catalog embeddings refinement dashboards comparison
 	@echo "\n✅ All project scripts completed successfully!"
@@ -35,7 +47,8 @@ quality_and_cohorts:
 policy_ingestion:
 	$(call RUN_SQL,01_policy_ingestion.sql)
 image_summaries:
-	$(call RUN_SQL,03_image_summaries.sql)
+	@echo "--> Using image summarization method: [$(IMAGE_METHOD)]"
+	$(call RUN_SQL, $(IMAGE_SCRIPT))
 case_summaries:
 	$(call RUN_SQL,04_case_summaries.sql)
 triage:
