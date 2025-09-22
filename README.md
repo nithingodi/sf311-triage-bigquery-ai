@@ -25,7 +25,7 @@ The pipeline uses four key BigQuery AI features:
 ## 🏗 Architecture
 
 A visual representation of the end-to-end pipeline.
-![Architecture](diagrams/architecture.png)
+![Architecture](RAG-architecture.png)
 
 ---
 
