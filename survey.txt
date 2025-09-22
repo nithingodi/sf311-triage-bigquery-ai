@@ -1,3 +1,26 @@
-BigQuery AI: ~1 month
-GCP: ~4 months
-Feedback: SQL-first approach worked well; needs fuller policy corpus and streaming in future.
+## BigQuery AI Hackathon User Survey
+
+---
+### **1. Please tell us how many months of experience with BigQuery AI each team member has.**
+
+* Team Member 1 (ME): 1 month
+
+---
+### **2. Please tell us how many months of experience with Google Cloud each team member has.**
+
+* Team Member 1 (ME): 4 months
+
+---
+### **3. We’d love to hear from you and your experience in working with the technology during this hackathon, positive or negative. Please provide any feedback on your experience with BigQuery AI.**
+
+#### **Positive Feedback:**
+
+* **Seamless AI Integration:** The SQL-first approach is the standout feature. The ability to invoke powerful models for text generation, embedding, and vector search directly within BigQuery dramatically simplifies the process of building a RAG pipeline, effectively turning a complex, multi-service architecture into a series of SQL scripts.
+* **Intuitive User Interface:** The BigQuery UI was very intuitive for a new user. It was straightforward to navigate, run queries, create datasets, and manage the core components of the project without a steep learning curve.
+
+#### **Challenges & Areas for Improvement:**
+
+* **Silent Failures in Multimodal URL Fetching:** The most significant issue encountered was how the `AI.GENERATE` function handles inaccessible public image URLs. When a URL was dead or blocked, the model did not return an error. Instead, it returned a generic, "hallucinated" summary (e.g., "A large pile of trash..."). This silent failure is critical because it introduces incorrect data into the pipeline. An ideal behavior would be for the function to return a `NULL` or a specific error status, allowing developers to handle these failures programmatically.
+* **Brittleness of Prompt Engineering for JSON Output:** Getting consistent, valid JSON from `ML.GENERATE_TEXT` required very specific and rigid prompt engineering. A more robust, dedicated mode for "structured data extraction" that is less sensitive to minor prompt variations would significantly improve the developer experience.
+* **RAG Generation Faithfulness:** In the final RAG step, the model sometimes struggled to perfectly incorporate the nuance of the retrieved policy snippet. This highlights the ongoing challenge of strict "instruction following" in a complex synthesis task. Enhanced controls to more strongly enforce groundedness on the provided context could improve the reliability of the RAG pattern.
+* **UI Conflict with Cloud Shell:** When the Cloud Shell terminal is active at the bottom of the screen, the dropdown functionality in the main BigQuery Explorer panel stops working. This disrupts the development workflow by forcing users to constantly open and close the terminal to browse their project's schema.
