@@ -8,16 +8,13 @@ BQ_CONNECTION_ID := sf311-conn
 
 # Controls which image summarization method to use.
 # Options: 'public_url' (default) or 'obj_table' (recommended)
-# To run the object table version, use the command: make run_all IMAGE_METHOD=obj_table
 IMAGE_METHOD ?= public_url
 
-# Determine the correct SQL script based on the chosen method
 ifeq ($(IMAGE_METHOD), obj_table)
 	IMAGE_SCRIPT := 03_image_summaries_v2_objtable.sql
 else
 	IMAGE_SCRIPT := 03_image_summaries.sql
 endif
-
 
 # --- Main Target ---
 .PHONY: run_all
@@ -37,7 +34,6 @@ endef
 
 
 # --- Individual SQL Script Targets ---
-.PHONY: models views quality_and_cohorts policy_ingestion image_summaries case_summaries triage label_taxonomy policy_catalog embeddings refinement dashboards comparison
 models:
 	$(call RUN_SQL,02_models.sql)
 views:
@@ -71,7 +67,13 @@ comparison:
 	$(call RUN_SQL,09_proto_comparison.sql)
 
 
-# --- Cleanup Target ---
+# --- Cleanup Targets ---
+.PHONY: clean_summaries
+clean_summaries:
+	@echo "--- Clearing previous image and case summaries ---"
+	@bq rm -f -t "$(PROJECT_ID):$(DATASET_ID).batch_image_summaries"
+	@bq rm -f -t "$(PROJECT_ID):$(DATASET_ID).batch_case_summaries"
+
 .PHONY: clean
 clean:
 	@echo "--- Tearing down all project resources ---"
