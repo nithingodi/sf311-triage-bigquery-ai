@@ -1,0 +1,49 @@
+=========================================================
+ARCHITECTURAL EXPLANATIONS: TWO VERSIONS
+=========================================================
+
+This document contains two distinct versions of the architectural explanation for the SF311 RAG pipeline.
+
+---------------------------------------------------------
+VERSION 1: EXPLANATION BY SCRIPT NAME (FOR A TECHNICAL DEEP DIVE)
+---------------------------------------------------------
+
+This version explains the pipeline by referencing the specific SQL scripts that execute each stage, providing a direct link between the architecture and the code.
+
+1. FOUNDATION AND PREPARATION (Scripts '01_*', '02_*')
+The pipeline begins by creating the necessary AI models ('02_models.sql') and the foundational views ('02_views.sql') on the raw data. In parallel, the raw 'policy_chunks' are ingested ('01_policy_ingestion.sql').
+
+2. COMPLAINT TRIAGE AND UNIFICATION (Scripts '03_*', '04_*')
+A quality check ('03_quality_and_cohorts.sql') routes each complaint based on its text quality. For complaints with bad text, the pipeline has two configurable modes:
+* BASELINE: '03_image_summaries.sql' uses public URLs to generate a summary.
+* IMPROVED: '03_image_summaries_v2_objtable.sql' uses a BigQuery Object Table for more reliable summarization.
+
+The results are then unified by '04_case_summaries.sql'. Finally, '04_triage_generate_v2.sql' uses ML.GENERATE_TEXT to parse the unified summaries into a structured format.
+
+3. KNOWLEDGE BASE CREATION (Scripts '05_*')
+In parallel, the five '05_*' scripts create the full knowledge base. This involves cleaning the policy text, generating vector embeddings with ML.GENERATE_EMBEDDING, and assembling the final, validated 'policy_catalog'.
+
+4. RAG CORE: RETRIEVAL AND GENERATION (Scripts '06_*', '07_*')
+The '06_..._search.sql' script is the core of the RETRIEVAL phase. It vectorizes the complaints, performs the VECTOR_SEARCH, and applies a two-tiered hybrid filter to find the best policy match. The final '07_*' scripts then perform the AUGMENTATION and GENERATION. '07_refine_prep.sql' assembles all the context, and '07_refinement.sql' uses AI.GENERATE to synthesize the final, policy-aligned action.
+
+=========================================================
+VERSION 2: EXPLANATION BY DIAGRAM ICONS (FOR A HIGH-LEVEL PRESENTATION)
+=========================================================
+
+This version explains the pipeline by referencing the components in the visual diagram, making it perfect for a presentation.
+
+1. THE FOUNDATION: INPUTS AND ENABLERS
+The system is powered by two (Icon: Database) DATA SOURCES: the "Raw Dataset" of complaints and the "Policy chunks" knowledge base. The (Icon: AI Model) AI CAPABILITIES ('Gemini endpoint', 'Embed model') are enabled by the crucial (Icon: Connection Plug) "sf311-conn" connection.
+
+2. THE COMPLAINT TRIAGE FLOW
+The complaint data flows through a branching process.
+* "Good Text" is sent to the (Icon: AI Process) "ML.GENERATE" process for structured triage.
+* "Bad Text" is sent to the (Icon: AI Process) "AI.GENERATE" process for multimodal summarization.
+
+The outputs are unified in the (Icon: Data Store) "Complaints with AI generated summaries" data store.
+
+3. THE RAG CORE: RETRIEVAL AND GENERATION
+The RAG process begins.
+* The (Icon: AI Model) "Embed model" vectorizes both the "Policy chunks" and the unified "Complaints".
+* These are fed into the (Icon: AI Process) "Vector Search" process to find the best policy match.
+* Finally, the complaint and its retrieved policy are synthesized by a final generative AI call, producing the output stored in the (Icon: Data Store) "Refined actions" table.
