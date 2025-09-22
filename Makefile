@@ -6,16 +6,6 @@ DATASET_ID := sf311
 LOCATION := US
 BQ_CONNECTION_ID := sf311-conn
 
-# Controls which image summarization method to use.
-# Options: 'public_url' (default) or 'obj_table' (recommended)
-IMAGE_METHOD ?= public_url
-
-ifeq ($(IMAGE_METHOD), obj_table)
-	IMAGE_SCRIPT := 03_image_summaries_v2_objtable.sql
-else
-	IMAGE_SCRIPT := 03_image_summaries.sql
-endif
-
 # --- Main Target ---
 .PHONY: run_all
 run_all: models views quality_and_cohorts policy_ingestion image_summaries case_summaries triage label_taxonomy policy_catalog embeddings refinement dashboards comparison
@@ -43,8 +33,10 @@ quality_and_cohorts:
 policy_ingestion:
 	$(call RUN_SQL,01_policy_ingestion.sql)
 image_summaries:
-	@echo "--> Using image summarization method: [$(IMAGE_METHOD)]"
-	$(call RUN_SQL, $(IMAGE_SCRIPT))
+	# --- TO SWITCH PIPELINES: EDIT THE FILENAME ON THE LINE BELOW ---
+	# Option 1 (default): 03_image_summaries.sql
+	# Option 2 (improved): 03_image_summaries_v2_objtable.sql
+	$(call RUN_SQL,03_image_summaries_v2_objtable.sql)
 case_summaries:
 	$(call RUN_SQL,04_case_summaries.sql)
 triage:
